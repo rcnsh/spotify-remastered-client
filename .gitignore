@@ -1,0 +1,23 @@
+# Build output
+.gradle/
+.kotlin/
+build/
+app/build/
+
+# Local config: SDK path, Spotify app settings, Spicy Lyrics keys. Never commit.
+local.properties
+
+# Spotify Android SDK AARs: fetched by scripts/fetch-spotify-sdk.sh, not redistributed
+app/libs/*.aar
+
+# Binaries and signing keys
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Local
+.DS_Store
+.idea/
+*.iml
+*.log

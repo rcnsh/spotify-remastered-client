@@ -1,0 +1,38 @@
+// Google's Maven serves androidx and com.android only; Maven Central serves the rest.
+pluginManagement {
+    repositories {
+        google {
+            content {
+                includeGroupByRegex("androidx\\..*")
+                includeGroupByRegex("com\\.android(\\..*)?")
+                includeGroupByRegex("com\\.google\\..*")
+            }
+        }
+        mavenCentral {
+            content {
+                excludeGroupByRegex("androidx\\..*")
+                excludeGroupByRegex("com\\.android(\\..*)?")
+            }
+        }
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google {
+            content {
+                includeGroupByRegex("androidx\\..*")
+                includeGroupByRegex("com\\.android(\\..*)?")
+                includeGroupByRegex("com\\.google\\.android\\..*")
+            }
+        }
+        mavenCentral {
+            content {
+                excludeGroupByRegex("androidx\\..*")
+                excludeGroupByRegex("com\\.android(\\..*)?")
+            }
+        }
+    }
+}
+rootProject.name = "remastered"
+include(":app")

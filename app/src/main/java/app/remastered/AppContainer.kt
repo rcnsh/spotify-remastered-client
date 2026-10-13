@@ -1,0 +1,68 @@
+package app.remastered
+
+import android.content.Context
+import android.os.Build
+import android.os.SystemClock
+import app.remastered.core.AppSettings
+import app.remastered.core.Catalog
+import app.remastered.core.LikedIndex
+import app.remastered.core.Player
+import app.remastered.core.RecentSearches
+import app.remastered.core.lyrics.CurrentLyrics
+import app.remastered.core.lyrics.LyricsSource
+import app.remastered.spicylyrics.LyricsCache
+import app.remastered.spicylyrics.SpicyLyrics
+import app.remastered.spicylyrics.SpicyLyricsApi
+import java.io.File
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+
+/**
+ * Wires the app together. Resetting the app ([RemasteredApp.restart]) builds a new container;
+ * screens get everything from here.
+ */
+class AppContainer(val context: Context) {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    val clock: () -> Long = SystemClock::elapsedRealtime
+
+    val settings = AppSettings(context.getSharedPreferences(PREFS_SETTINGS, Context.MODE_PRIVATE))
+    val spotify = SpotifyServices(context, scope, clock, settings)
+    val catalog: Catalog = spotify.catalog
+    val player: Player = spotify.player
+
+    val liked = LikedIndex(catalog, scope)
+    val recentSearches = RecentSearches(context.getSharedPreferences(PREFS_SEARCH, Context.MODE_PRIVATE)) { settings.saveRecentSearches.on }
+
+    /** Spicy Lyrics responses, at most 30 days old (their terms). */
+    val lyricsCache = LyricsCache(File(context.cacheDir, "lyrics"))
+    /** Requests show up in Settings → Web API requests (path and status only, never the key). */
+    val lyricsSource: LyricsSource = SpicyLyrics(
+        SpicyLyricsApi(OkHttpClient.Builder().callTimeout(20, TimeUnit.SECONDS).addInterceptor(spotify.requests).build(), BuildConfig.SPICY_LYRICS_KEY),
+        lyricsCache,
+    )
+    val currentLyrics = CurrentLyrics(player, lyricsSource, settings.lyrics.value, scope)
+
+    init {
+        scope.launch(Dispatchers.IO) { lyricsCache.sweep() }
+    }
+
+    fun close() {
+        player.disconnect()
+        scope.cancel()
+    }
+
+    companion object {
+        const val PREFS_SETTINGS = "settings"
+        const val PREFS_SEARCH = "search"
+
+        /** Emulators can't run a logged-in Spotify app (Play Integrity), so App Remote can't connect there. */
+        val isEmulator: Boolean
+            get() = Build.FINGERPRINT.contains("generic") || Build.FINGERPRINT.contains("sdk_gphone") ||
+                Build.HARDWARE.contains("ranchu") || Build.PRODUCT.contains("sdk")
+    }
+}
