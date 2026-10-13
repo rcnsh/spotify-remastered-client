@@ -54,18 +54,29 @@ object WrappedSoundtrack {
     /** A hook after this point is too late to be worth jumping to. */
     private const val MIN_TAIL_MS = 20_000L
 
+    /** The same line again within this is the same phrase sung twice, not another chorus. */
+    private const val BACK_TO_BACK_MS = 8_000L
+
     /**
      * Where to start a song: the first time its chorus is sung, taken as the most repeated lyric
      * line (needs at least two repeats and a few words, so ad-libs don't count); without synced
      * lyrics, about 30% in, where most pop songs reach their first chorus.
+     *
+     * A line sung twice in a row (within a few seconds) counts once: an outro chant ("Let the vibe, let the vibe" ×8 at
+     * the end of Chlorine) would otherwise outnumber the chorus and start the song in its last minute.
      */
     fun hookMs(lyrics: Lyrics?, durationMs: Long): Long {
         val fallback = if (durationMs > 0) (durationMs * 0.3).toLong() else 0L
         if (lyrics == null || lyrics.sync == Lyrics.Sync.Static) return fallback
         val seen = LinkedHashMap<String, Pair<Int, Long>>()
+        var previous: String? = null
+        var previousStart = Long.MIN_VALUE / 2
         for (line in lyrics.lines) {
             val key = normalise(line.lead.text)
-            if (key.length < 12 && key.count { it == ' ' } < 2) continue
+            val repeat = key == previous && line.startMs - previousStart < BACK_TO_BACK_MS
+            previous = key
+            previousStart = line.startMs
+            if (repeat || (key.length < 12 && key.count { it == ' ' } < 2)) continue
             val (count, first) = seen[key] ?: (0 to line.startMs)
             seen[key] = (count + 1) to first
         }

@@ -34,6 +34,25 @@ class SoundtrackTest {
         assertEquals(42_000L, WrappedSoundtrack.hookMs(l, 200_000))
     }
 
+    @Test fun `an outro chant sung back to back doesn't outnumber the chorus`() {
+        // Chlorine's shape: the chorus line three times, then a chant sung twice in a row per bar.
+        val l = lyrics(
+            17_000L to "Sipping on straight chlorine",
+            22_000L to "This beat is a chemical",
+            70_000L to "Sipping on straight chlorine",
+            156_000L to "Sipping on straight chlorine",
+            179_000L to "Let the vibe, let the vibe",
+            182_000L to "Let the vibe, let the vibe",
+            185_000L to "Beat is a chemical, yeah",
+            190_000L to "Let the vibe, let the vibe",
+            193_000L to "Let the vibe, let the vibe",
+            196_000L to "Moment is medical, yeah",
+            201_000L to "Let the vibe, let the vibe",
+            204_000L to "Let the vibe, let the vibe",
+        )
+        assertEquals(17_000L, WrappedSoundtrack.hookMs(l, 324_000))
+    }
+
     @Test fun `without a repeated line or lyrics it starts 30 percent in`() {
         assertEquals(60_000L, WrappedSoundtrack.hookMs(null, 200_000))
         assertEquals(60_000L, WrappedSoundtrack.hookMs(lyrics(1_000L to "one line only here", 5_000L to "and another different one"), 200_000))
