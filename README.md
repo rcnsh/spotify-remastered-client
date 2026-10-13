@@ -21,6 +21,11 @@ Spotify: it drives the installed, unmodified Spotify app.
   - Home's "On repeat" and "On this day", and "Your plays" on artist pages and in the song menu.
   - Stats: plays per day (7 days, 30 days, a year or any range), top artists, on repeat,
     streaks and listening by hour, top artists and songs per quarter and year, eras, top albums.
+  - Wrapped: a native port of [music-warehouse-wrapped](https://github.com/rcnsh/music-warehouse-wrapped)'s
+    story for each year (and the year so far): the same 14 slides, timing and motion, drawn
+    frame by frame in Compose. Tap, hold to pause, swipe down to close; each music slide plays
+    its song through Spotify from the chorus; share a frame or the summary card as a PNG, or
+    export the whole story as an MP4, silent or over a song file of your own.
 - Spotify keeps doing playback, DRM, downloads, the notification and Connect.
 
 Built with Kotlin and Jetpack Compose. Not affiliated with Spotify or Spicy Lyrics.
@@ -64,3 +69,16 @@ adb shell am start -n app.remastered/.MainActivity --es lyrics_preview spotify:t
 ```
 
 In the app, the same preview is under Settings → Open a Spotify uri → Lyrics.
+
+## Checking Wrapped without signing in
+
+Debug builds can open a Wrapped story straight from the warehouse (the debug read token), with
+no Spotify session: artist photos fall back to the web's, and there is no soundtrack.
+
+```sh
+adb shell am start -n app.remastered/.MainActivity --es wrapped_preview 2025-01-01:2025-12-31
+```
+
+`--ei wrapped_frame 423` opens it paused at a frame, `--es wrapped_dump 110,244` renders frames
+to PNGs in the app's external files (`wrapped/`), and `--es wrapped_export silent` (or a song
+file's uri) starts a video export. In the app it's under Settings → Wrapped preview.

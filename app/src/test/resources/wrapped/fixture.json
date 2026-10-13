@@ -1,0 +1,307 @@
+{
+ "data": {
+  "range": {
+   "from": "2025-01-01",
+   "to": "2025-12-31",
+   "days": 365
+  },
+  "computed_at": "2026-01-02T03:00:00.000Z",
+  "totals": {
+   "minutes": 24680,
+   "plays": 7012,
+   "skips": 1203,
+   "days_listened": 301,
+   "artists": 412,
+   "songs": 1288
+  },
+  "biggest_day": {
+   "date": "2025-07-22",
+   "minutes": 512
+  },
+  "hours": [
+   300,
+   220,
+   140,
+   90,
+   40,
+   10,
+   5,
+   8,
+   60,
+   180,
+   260,
+   420,
+   520,
+   610,
+   700,
+   820,
+   760,
+   640,
+   560,
+   600,
+   540,
+   480,
+   410,
+   350
+  ],
+  "weekdays": [
+   3400,
+   3500,
+   3300,
+   3700,
+   3600,
+   3100,
+   3400
+  ],
+  "top_artists": [
+   {
+    "name": "Paper Lanterns",
+    "minutes": 9800,
+    "plays": 2450,
+    "share": 0.397,
+    "days": 120,
+    "longest_run_days": 21,
+    "top_song": "Glasshouse",
+    "image": null
+   },
+   {
+    "name": "The Night Bus",
+    "minutes": 4100,
+    "plays": 1025,
+    "share": 0.166,
+    "days": 110,
+    "longest_run_days": 9,
+    "top_song": "Last Stop",
+    "image": null
+   },
+   {
+    "name": "Mira Vale",
+    "minutes": 2600,
+    "plays": 650,
+    "share": 0.105,
+    "days": 100,
+    "longest_run_days": 4,
+    "top_song": "Saltwater",
+    "image": null
+   },
+   {
+    "name": "Copper Tides",
+    "minutes": 2200,
+    "plays": 550,
+    "share": 0.089,
+    "days": 90,
+    "longest_run_days": 2,
+    "top_song": "Undertow",
+    "image": null
+   },
+   {
+    "name": "Lo & The Hollows",
+    "minutes": 1700,
+    "plays": 425,
+    "share": 0.069,
+    "days": 80,
+    "longest_run_days": 3,
+    "top_song": "Kite Season",
+    "image": null
+   }
+  ],
+  "top_songs": [
+   {
+    "name": "Glasshouse",
+    "artist": "Paper Lanterns",
+    "album": "Lanterns",
+    "image": null,
+    "plays": 150,
+    "minutes": 540,
+    "peak_month": "2025-06",
+    "first_played": "2024-11-01"
+   },
+   {
+    "name": "Last Stop",
+    "artist": "The Night Bus",
+    "album": "Last Stop (Deluxe)",
+    "image": null,
+    "plays": 130,
+    "minutes": 480,
+    "peak_month": "2025-07",
+    "first_played": "2024-11-02"
+   },
+   {
+    "name": "Saltwater",
+    "artist": "Mira Vale",
+    "album": "Saltwater (Deluxe)",
+    "image": null,
+    "plays": 110,
+    "minutes": 420,
+    "peak_month": "2025-08",
+    "first_played": "2024-11-03"
+   },
+   {
+    "name": "Undertow",
+    "artist": "Copper Tides",
+    "album": "Undertow (Deluxe)",
+    "image": null,
+    "plays": 90,
+    "minutes": 360,
+    "peak_month": "2025-09",
+    "first_played": "2024-11-04"
+   },
+   {
+    "name": "Kite Season",
+    "artist": "Lo & The Hollows",
+    "album": "Kite Season (Deluxe)",
+    "image": null,
+    "plays": 70,
+    "minutes": 300,
+    "peak_month": "2025-10",
+    "first_played": "2024-11-05"
+   }
+  ],
+  "top_albums": [
+   {
+    "name": "Lanterns",
+    "artist": "Paper Lanterns",
+    "image": null,
+    "plays": 900,
+    "minutes": 3100,
+    "songs": 12
+   }
+  ],
+  "months": [
+   {
+    "month": "2025-01",
+    "minutes": 2000,
+    "top_artist": "Paper Lanterns",
+    "top_song": "Glasshouse",
+    "image": null
+   },
+   {
+    "month": "2025-02",
+    "minutes": 2137,
+    "top_artist": "The Night Bus",
+    "top_song": "Last Stop",
+    "image": null
+   },
+   {
+    "month": "2025-03",
+    "minutes": 2274,
+    "top_artist": "Mira Vale",
+    "top_song": "Saltwater",
+    "image": null
+   },
+   {
+    "month": "2025-04",
+    "minutes": 2411,
+    "top_artist": "Copper Tides",
+    "top_song": "Undertow",
+    "image": null
+   },
+   {
+    "month": "2025-05",
+    "minutes": 2548,
+    "top_artist": "Lo & The Hollows",
+    "top_song": "Kite Season",
+    "image": null
+   },
+   {
+    "month": "2025-06",
+    "minutes": 2685,
+    "top_artist": "Paper Lanterns",
+    "top_song": "Glasshouse",
+    "image": null
+   },
+   {
+    "month": "2025-07",
+    "minutes": 2822,
+    "top_artist": "The Night Bus",
+    "top_song": "Paper Moon",
+    "image": null
+   },
+   {
+    "month": "2025-08",
+    "minutes": 2959,
+    "top_artist": "Mira Vale",
+    "top_song": "Last Stop",
+    "image": null
+   },
+   {
+    "month": "2025-09",
+    "minutes": 3096,
+    "top_artist": "Copper Tides",
+    "top_song": "Glasshouse",
+    "image": null
+   },
+   {
+    "month": "2025-10",
+    "minutes": 3233,
+    "top_artist": "Lo & The Hollows",
+    "top_song": "Saltwater",
+    "image": null
+   },
+   {
+    "month": "2025-11",
+    "minutes": 3370,
+    "top_artist": "Paper Lanterns",
+    "top_song": "Low Sun",
+    "image": null
+   },
+   {
+    "month": "2025-12",
+    "minutes": 3507,
+    "top_artist": "The Night Bus",
+    "top_song": "Glasshouse",
+    "image": null
+   }
+  ],
+  "discoveries": {
+   "artists": 187,
+   "songs": 640,
+   "share": 0.31,
+   "top": [
+    {
+     "name": "Mira Vale",
+     "minutes": 980,
+     "image": null
+    }
+   ]
+  },
+  "listening_age": {
+   "age": 22,
+   "median_year": 2019,
+   "window": [
+    2018,
+    2021
+   ],
+   "coverage": 0.81,
+   "decades": [
+    {
+     "decade": 1990,
+     "share": 0.06
+    },
+    {
+     "decade": 2000,
+     "share": 0.14
+    },
+    {
+     "decade": 2010,
+     "share": 0.41
+    },
+    {
+     "decade": 2020,
+     "share": 0.38
+    },
+    {
+     "decade": 1980,
+     "share": 0.01
+    }
+   ]
+  },
+  "streak": {
+   "days": 38,
+   "from": "2025-03-02",
+   "to": "2025-04-08"
+  }
+ },
+ "artistImages": {},
+ "audio": null
+}
