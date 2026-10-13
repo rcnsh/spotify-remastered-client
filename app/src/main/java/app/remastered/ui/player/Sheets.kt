@@ -49,6 +49,7 @@ import app.remastered.core.model.DeviceType
 import app.remastered.core.model.Playlist
 import app.remastered.core.model.best
 import app.remastered.core.model.canEdit
+import app.remastered.core.warehouse.WarehouseFeature
 import app.remastered.ui.AppState
 import app.remastered.ui.Load
 import app.remastered.ui.Route
@@ -59,6 +60,8 @@ import app.remastered.ui.components.ErrorMessage
 import app.remastered.ui.components.Loading
 import app.remastered.ui.components.SubText
 import app.remastered.ui.components.TitleText
+import app.remastered.ui.history.HistoryIcons
+import app.remastered.ui.history.warehouseSupports
 import app.remastered.ui.load
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
@@ -110,6 +113,9 @@ fun TrackMenuSheet(app: AppState, menu: TrackMenu) {
         MenuItem(Icons.AddQueue, "Add to queue") { then { app.queue(t) } }
         if (menu.playlist != null && menu.playlist.canEdit(app.me)) {
             MenuItem(Icons.Remove, "Remove from ${menu.playlist.name}") { then { app.removeFrom(menu.playlist, t) } }
+        }
+        if (!t.isEpisode && app.warehouseSupports(WarehouseFeature.TrackHistory)) {
+            MenuItem(HistoryIcons.History, "Your plays") { then { app.open(Route.HistoryTrack(t.id)) } }
         }
         t.album?.let { album -> MenuItem(Icons.Disc, "Go to album") { then { app.open(Route.Album(album.id)) } } }
         t.artists.firstOrNull()?.let { artist -> MenuItem(Icons.User, "Go to artist") { then { app.open(Route.Artist(artist.id)) } } }
