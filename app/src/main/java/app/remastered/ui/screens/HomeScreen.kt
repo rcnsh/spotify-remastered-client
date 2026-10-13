@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -26,11 +27,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.remastered.core.Connection
 import app.remastered.core.model.TimeRange
 import app.remastered.core.model.best
+import app.remastered.core.warehouse.WarehouseFeature
 import app.remastered.ui.AppState
 import app.remastered.ui.Load
 import app.remastered.ui.Route
@@ -44,6 +47,7 @@ import app.remastered.ui.components.ScreenPadding
 import app.remastered.ui.components.SectionHeader
 import app.remastered.ui.components.TrackRow
 import app.remastered.ui.load
+import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
 import kotlinx.coroutines.async
@@ -113,6 +117,7 @@ fun HomeScreen(app: AppState) {
             }
         }
         item { ConnectionBanner(app, connection) }
+        item { HistoryShortcuts(app) }
         when (val s = home.state) {
             Load.Loading -> item { Loading() }
             is Load.Failed -> item { ErrorMessage(s.message, home.retry) }
@@ -172,6 +177,31 @@ private fun Carousel(app: AppState, title: String, items: List<HomeItem>, size: 
                     size = size.dp, round = item.round, centered = item.round)
             }
         }
+    }
+}
+
+/** Stats and Wrapped from the user's listening history; nothing when the warehouse isn't set up. */
+@Composable
+private fun HistoryShortcuts(app: AppState) {
+    val state by app.c.warehouse.state.collectAsState()
+    val missing by app.c.warehouse.missing.collectAsState()
+    if (!state.isUsable) return
+    Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        HistoryShortcut("Your stats", Icons.Sort, Modifier.weight(1f)) { app.open(Route.Stats) }
+        if (WarehouseFeature.WrappedRanges !in missing) HistoryShortcut("Your Wrapped", Icons.Play, Modifier.weight(1f)) { app.open(Route.Wrapped) }
+        else Box(Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun HistoryShortcut(title: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    Row(
+        modifier.height(48.dp).clip(RoundedCornerShape(12.dp)).background(Palette.surface)
+            .border(1.dp, Palette.line, RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, Modifier.size(18.dp), tint = Palette.accent)
+        Text(title, style = Type.label.copy(fontWeight = Type.section.fontWeight), color = Palette.text, modifier = Modifier.padding(start = 10.dp))
     }
 }
 

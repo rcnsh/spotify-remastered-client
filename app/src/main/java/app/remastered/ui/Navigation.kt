@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import java.time.LocalDate
 
 sealed interface Route {
     data object Home : Route
@@ -14,6 +15,22 @@ sealed interface Route {
     data class Album(val id: String) : Route
     data class Artist(val id: String) : Route
     data object Settings : Route
+
+    // Listening history, from the user's music-warehouse. Entry points show only while
+    // AppContainer.warehouse.state.isUsable; each screen lives in its own package (ui.history,
+    // ui.stats, ui.wrapped) so features can grow without touching each other.
+    /** Every play, newest first. */
+    data object History : Route
+    /** One artist in the history; [id] may be null for artists only known by name. */
+    data class HistoryArtist(val id: String?, val name: String) : Route
+    /** One track in the history, by Spotify track id. */
+    data class HistoryTrack(val id: String) : Route
+    /** Listening stats: on repeat, rhythm, top over time, eras, albums. */
+    data object Stats : Route
+    /** Wrapped: pick a range. */
+    data object Wrapped : Route
+    /** The Wrapped story for one range (full screen: no mini player or tabs). */
+    data class WrappedStory(val from: LocalDate, val to: LocalDate) : Route
 
     companion object {
         /** Opens a `spotify:` uri as a screen, or null if the app has no screen for it. */
