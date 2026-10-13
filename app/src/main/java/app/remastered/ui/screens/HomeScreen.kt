@@ -46,6 +46,9 @@ import app.remastered.ui.components.Loading
 import app.remastered.ui.components.ScreenPadding
 import app.remastered.ui.components.SectionHeader
 import app.remastered.ui.components.TrackRow
+import app.remastered.ui.history.onThisDay
+import app.remastered.ui.history.rememberHomeHistory
+import app.remastered.ui.history.warehouseOnRepeat
 import app.remastered.ui.load
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
@@ -109,6 +112,7 @@ fun HomeScreen(app: AppState) {
     val home = load(Unit) { loadHome(app) }
     val connection by app.c.player.connection.collectAsState()
     val liked by app.c.liked.uris.collectAsState()
+    val history = rememberHomeHistory(app)
     LazyColumn(Modifier.fillMaxSize(), contentPadding = ScreenPadding) {
         item {
             Row(Modifier.statusBarsPadding().padding(start = 20.dp, end = 20.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -139,12 +143,14 @@ fun HomeScreen(app: AppState) {
                 if (d.topArtists.isNotEmpty()) item {
                     Carousel(app, "Your top artists", d.topArtists, size = 112, action = "This month")
                 }
-                if (d.onRepeat.isNotEmpty()) {
+                warehouseOnRepeat(app, history, liked)
+                if (history.useWebOnRepeat && d.onRepeat.isNotEmpty()) {
                     item { SectionHeader("On repeat", Modifier.padding(top = 30.dp, bottom = 6.dp), action = "Last 4 weeks") }
                     items(d.onRepeat, key = { "rep" + it.id }) { t ->
                         TrackRow(t, onClick = { app.play(t.uri) }, onMore = { app.menu = app.trackMenu(t) }, liked = t.uri in liked)
                     }
                 }
+                onThisDay(app, history)
             }
         }
     }
