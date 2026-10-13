@@ -37,10 +37,11 @@ class RemasteredApp : Application(), SingletonImageLoader.Factory {
         container = AppContainer(this)
     }
 
-    /** Signs out and deletes every setting, recent search and cached lyric, then [restart]s. Clear images separately. */
+    /** Signs out and deletes every setting (warehouse included), recent search and cached lyric, then [restart]s. Clear images separately. */
     fun reset() {
         container?.spotify?.signOut()
         container?.lyricsCache?.clear()
+        container?.warehouse?.clear()
         listOf(AppContainer.PREFS_SETTINGS, AppContainer.PREFS_SEARCH).forEach {
             getSharedPreferences(it, Context.MODE_PRIVATE).edit().clear().commit()
         }

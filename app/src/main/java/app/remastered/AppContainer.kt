@@ -13,6 +13,8 @@ import app.remastered.core.lyrics.LyricsSource
 import app.remastered.spicylyrics.LyricsCache
 import app.remastered.spicylyrics.SpicyLyrics
 import app.remastered.spicylyrics.SpicyLyricsApi
+import app.remastered.warehouse.KeystoreWarehouseConfigStore
+import app.remastered.warehouse.WarehouseServices
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -47,8 +49,20 @@ class AppContainer(val context: Context) {
     )
     val currentLyrics = CurrentLyrics(player, lyricsSource, settings.lyrics.value, scope)
 
+    /**
+     * Listening history from the user's music-warehouse (Settings → Listening history). Features
+     * built on it check [WarehouseServices.state] and hide themselves when it isn't usable.
+     * Requests show up in Settings → Web API requests (path and query only, never the token).
+     */
+    val warehouse = WarehouseServices(
+        KeystoreWarehouseConfigStore(context),
+        OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).addInterceptor(spotify.requests).build(),
+        defaults = WarehouseServices.defaults(BuildConfig.WAREHOUSE_URL, BuildConfig.WAREHOUSE_TOKEN),
+    )
+
     init {
         scope.launch(Dispatchers.IO) { lyricsCache.sweep() }
+        if (warehouse.isConfigured) scope.launch { warehouse.check() }
     }
 
     fun close() {

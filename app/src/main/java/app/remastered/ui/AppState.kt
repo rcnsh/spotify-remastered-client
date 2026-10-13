@@ -14,6 +14,7 @@ import app.remastered.core.model.Image
 import app.remastered.core.model.Playlist
 import app.remastered.core.model.Track
 import app.remastered.core.model.UserRef
+import app.remastered.core.warehouse.WarehouseException
 import kotlinx.coroutines.launch
 
 /** A song whose menu is open, and the playlist it was opened from (for "Remove from …"). */
@@ -135,13 +136,14 @@ class AppState(val c: AppContainer, private val context: Context) {
 
     fun message(text: String) { c.scope.launch { snackbar.currentSnackbarData?.dismiss(); snackbar.showSnackbar(text) } }
 
-    /** Runs a catalog call, turning failures into a message instead of a crash. */
+    /** Runs a catalog or warehouse call, turning failures into a message instead of a crash. */
     fun launch(block: suspend () -> Unit) = c.scope.launch {
-        try { block() } catch (e: CatalogException) { message(describe(e)) }
+        try { block() } catch (e: CatalogException) { message(describe(e)) } catch (e: WarehouseException) { message(e.userMessage) }
     }
 
     companion object {
         fun describe(e: Throwable): String = when {
+            e is WarehouseException -> e.userMessage
             e is CatalogException && e.isRateLimited -> "Spotify is limiting requests. Try again in a minute."
             e is CatalogException && e.isAuth -> "Sign in to Spotify again."
             e is CatalogException && e.isForbidden -> "Spotify doesn't allow that for this app."
