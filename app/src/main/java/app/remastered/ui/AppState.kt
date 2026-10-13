@@ -14,6 +14,7 @@ import app.remastered.core.model.Image
 import app.remastered.core.model.Playlist
 import app.remastered.core.model.Track
 import app.remastered.core.model.UserRef
+import app.remastered.core.waitText
 import app.remastered.core.warehouse.WarehouseException
 import kotlinx.coroutines.launch
 
@@ -144,7 +145,8 @@ class AppState(val c: AppContainer, private val context: Context) {
     companion object {
         fun describe(e: Throwable): String = when {
             e is WarehouseException -> e.userMessage
-            e is CatalogException && e.isRateLimited -> "Spotify is limiting requests. Try again in a minute."
+            e is CatalogException && e.isRateLimited ->
+                "Spotify is limiting requests. Try again in ${e.retryAfterMs?.let(::waitText) ?: "a minute"}."
             e is CatalogException && e.isAuth -> "Sign in to Spotify again."
             e is CatalogException && e.isForbidden -> "Spotify doesn't allow that for this app."
             e is CatalogException && e.status == null -> "Can't reach Spotify. Check your connection."

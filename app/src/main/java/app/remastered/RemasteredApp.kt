@@ -9,6 +9,7 @@ import app.remastered.ui.components.RemoteImageFetcher
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import java.io.File
 
 /** Holds the current [AppContainer]; [restart] replaces it. */
 class RemasteredApp : Application(), SingletonImageLoader.Factory {
@@ -37,10 +38,11 @@ class RemasteredApp : Application(), SingletonImageLoader.Factory {
         container = AppContainer(this)
     }
 
-    /** Signs out and deletes every setting (warehouse included), recent search and cached lyric, then [restart]s. Clear images separately. */
+    /** Signs out and deletes every setting (warehouse included), recent search, cached lyric and saved Liked Songs, then [restart]s. Clear images separately. */
     fun reset() {
         container?.spotify?.signOut()
         container?.lyricsCache?.clear()
+        File(cacheDir, AppContainer.LIKED_SONGS).delete()
         container?.warehouse?.clear()
         listOf(AppContainer.PREFS_SETTINGS, AppContainer.PREFS_SEARCH).forEach {
             getSharedPreferences(it, Context.MODE_PRIVATE).edit().clear().commit()

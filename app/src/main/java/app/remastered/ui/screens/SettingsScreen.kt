@@ -149,7 +149,7 @@ private fun AccountCard(app: AppState) {
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (me != null) Chip("Open in Spotify", false, { app.viewUri("spotify:user:${me.id}") })
                 else Chip("Retry", false, { app.reloadProfile() })
-                Chip("Sign out", false, { app.c.screens.clear(); app.c.spotify.signOut() })
+                Chip("Sign out", false, { app.c.screens.clear(); app.c.liked.clear(); app.c.spotify.signOut() })
             }
         }
     }
@@ -196,7 +196,7 @@ private fun LibraryGroup(app: AppState) {
     val recent by c.recentSearches.entries.collectAsState()
     Group("Library") {
         Toggle("Load Liked Songs at start", "Powers the ♥ marks in lists and \"In your library\" on artist pages. " +
-            "Off: they load when you open Liked Songs or an artist.", c.settings.preloadLiked)
+            "Saved on this phone, so a start only fetches what's new. Off: they load when you open Liked Songs or an artist.", c.settings.preloadLiked)
         Item("Liked Songs index", "%,d songs%s".format(liked.size, if (complete) "" else " (not fully loaded)")) {
             Chip("Reload", false, { c.liked.reload() })
         }

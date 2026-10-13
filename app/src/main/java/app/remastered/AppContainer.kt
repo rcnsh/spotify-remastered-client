@@ -6,6 +6,7 @@ import android.os.SystemClock
 import app.remastered.core.AppSettings
 import app.remastered.core.Catalog
 import app.remastered.core.LikedIndex
+import app.remastered.core.LikedSongsFile
 import app.remastered.core.Player
 import app.remastered.core.RecentSearches
 import app.remastered.core.ScreenCache
@@ -42,7 +43,8 @@ class AppContainer(val context: Context) {
     /** Remastered's own media notification while something plays (Settings → Playback). */
     val nowPlaying = NowPlayingNotification(context, player, settings.mediaNotification.value, scope)
 
-    val liked = LikedIndex(catalog, scope)
+    /** Liked Songs, saved between runs so a start only fetches what's new. */
+    val liked = LikedIndex(catalog, scope, LikedSongsFile(File(context.cacheDir, LIKED_SONGS)))
     /** What each screen loaded last, so switching between screens doesn't show a spinner every time. */
     val screens = ScreenCache(clock)
     val recentSearches = RecentSearches(context.getSharedPreferences(PREFS_SEARCH, Context.MODE_PRIVATE)) { settings.saveRecentSearches.on }
@@ -81,6 +83,7 @@ class AppContainer(val context: Context) {
     companion object {
         const val PREFS_SETTINGS = "settings"
         const val PREFS_SEARCH = "search"
+        const val LIKED_SONGS = "liked-songs.json"
 
         /** Emulators can't run a logged-in Spotify app (Play Integrity), so App Remote can't connect there. */
         val isEmulator: Boolean
