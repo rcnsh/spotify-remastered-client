@@ -1,5 +1,6 @@
 package app.remastered.ui
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -56,20 +57,28 @@ import app.remastered.ui.stats.StatsScreen
 import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
 import app.remastered.ui.wrapped.WrappedScreen
+import app.remastered.ui.wrapped.WrappedPreview
+import app.remastered.ui.wrapped.WrappedStory
 import app.remastered.ui.wrapped.WrappedStoryScreen
 
 /**
  * The whole UI for one [AppContainer]: sign-in if needed, then tabs, player and sheets.
  * [lyricsPreview] (debug builds only, see MainActivity) shows that track's lyrics preview first,
- * signed in or not.
+ * signed in or not; [wrappedPreview] likewise opens a Wrapped story.
  */
 @Composable
-fun RemasteredRoot(container: AppContainer, lyricsPreview: MutableState<String?>? = null) {
+fun RemasteredRoot(container: AppContainer, lyricsPreview: MutableState<String?>? = null, wrappedPreview: MutableState<WrappedPreview?>? = null) {
     val context = LocalContext.current
     val spotify = container.spotify
     lyricsPreview?.value?.let { uri ->
         BackHandler { lyricsPreview.value = null }
         LyricsPreviewScreen(container, uri) { lyricsPreview.value = null }
+        return
+    }
+    wrappedPreview?.value?.let { preview ->
+        BackHandler { wrappedPreview.value = null }
+        WrappedStory(container, preview.from, preview.to, onClose = { wrappedPreview.value = null },
+            message = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }, startFrame = preview.frame, dump = preview.dump)
         return
     }
     if (!SpotifyServices.isConfigured) {

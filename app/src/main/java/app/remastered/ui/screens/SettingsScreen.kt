@@ -74,6 +74,8 @@ import app.remastered.ui.components.artworkTintCount
 import app.remastered.ui.components.clearArtworkTints
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
+import app.remastered.ui.wrapped.WrappedPreview
+import app.remastered.BuildConfig
 import app.remastered.ui.theme.Type
 import app.remastered.warehouse.WarehouseConfig
 import coil3.SingletonImageLoader
@@ -108,6 +110,7 @@ fun SettingsScreen(app: AppState) {
         item { RequestsGroup(app) }
         item { PlayerStateGroup(app) }
         item { UriToolGroup(app) }
+        if (BuildConfig.DEBUG) item { WrappedPreviewGroup(app) }
         item { InfoGroup("Build", Diagnostics.build(c.context)) }
         item { InfoGroup("Device", Diagnostics.device()) }
         item { InfoGroup("Spotify developer app", Diagnostics.config(), copyable = true) }
@@ -481,6 +484,23 @@ private fun UriToolGroup(app: AppState) {
                 if (trimmed.startsWith("spotify:track:")) app.lyricsPreview = trimmed
                 else app.message("Lyrics need a spotify:track: uri")
             })
+        }
+    }
+}
+
+/** Debug builds only: open any range's Wrapped story (the `wrapped_preview` extra does the same before sign-in). */
+@Composable
+private fun WrappedPreviewGroup(app: AppState) {
+    var range by remember { mutableStateOf("2025-01-01:2025-12-31") }
+    val parsed = WrappedPreview.parse(range)
+    Group("Wrapped preview", "Any closed range as from:to. A read token can only open computed ranges.") {
+        Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(Palette.raised).padding(horizontal = 12.dp, vertical = 11.dp)) {
+            BasicTextField(range, { range = it }, singleLine = true, textStyle = MonoStyle.copy(color = Palette.text),
+                cursorBrush = SolidColor(Palette.accent), modifier = Modifier.fillMaxWidth())
+        }
+        Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+            Chip("Open story", parsed != null, { parsed?.let { app.open(Route.WrappedStory(it.from, it.to)) } ?: app.message("Use YYYY-MM-DD:YYYY-MM-DD") })
         }
     }
 }
