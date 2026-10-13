@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -41,12 +40,16 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -161,7 +164,15 @@ fun Stack(left: Number = 80, bottom: Number = 150, width: Number = 920, gap: Num
 
 // --- Type ---
 
-/** A text block with CSS-like line height: the leading split evenly above and below each line. */
+/**
+ * A text block laid out the way CSS lays it out: lines wrap at the available width (unless
+ * [wrap] is off), each line box is [lineHeight] em tall (the font's own height when null) and the
+ * glyphs sit centred in it, so a line height smaller than the font's ascent + descent pulls lines
+ * together and lets glyphs overhang the box, exactly like `line-height: 0.86`. Compose's own
+ * lineHeight doesn't shrink below the font's height, so lines are placed here by hand.
+ *
+ * The block is as wide as its widest line (CSS fit-content), or the exact width it's given.
+ */
 @Composable
 fun CssText(
     text: String,
@@ -175,22 +186,45 @@ fun CssText(
     align: TextAlign = TextAlign.Start,
     wrap: Boolean = true,
 ) {
-    BasicText(
-        text,
-        modifier,
-        style = TextStyle(
-            fontFamily = family,
-            fontWeight = FontWeight(weight),
-            fontSize = size.toFloat().sp,
-            color = color,
-            letterSpacing = letterSpacing,
-            textAlign = align,
-            lineHeight = lineHeight?.em ?: TextUnit.Unspecified,
-            lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
-        ),
-        softWrap = wrap,
-        overflow = TextOverflow.Visible,
-    )
+    val measurer = rememberTextMeasurer(cacheSize = 16)
+    val style = TextStyle(fontFamily = family, fontWeight = FontWeight(weight), fontSize = size.toFloat().sp, color = color, letterSpacing = letterSpacing)
+    val lines = remember { arrayOf<List<TextLayoutResult>>(emptyList()) }
+    val tops = remember { arrayOf(FloatArray(0)) }
+    val lefts = remember { arrayOf(FloatArray(0)) }
+    Layout(
+        modifier.drawBehind {
+            lines[0].forEachIndexed { i, line -> drawText(line, topLeft = Offset(lefts[0][i], tops[0][i])) }
+        },
+    ) { _, constraints ->
+        val maxWidth = if (wrap && constraints.hasBoundedWidth) constraints.maxWidth else Constraints.Infinity
+        val full = measurer.measure(text, style, softWrap = wrap, constraints = Constraints(maxWidth = maxWidth))
+        val laid = (0 until full.lineCount).map { i ->
+            val piece = text.substring(full.getLineStart(i), full.getLineEnd(i, visibleEnd = true))
+            measurer.measure(piece, style, softWrap = false)
+        }
+        val widest = laid.maxOfOrNull { it.size.width } ?: 0
+        val width = if (constraints.hasFixedWidth) constraints.maxWidth else widest.coerceIn(constraints.minWidth, constraints.maxWidth)
+        val lineBox = lineHeight?.let { (it * size.toFloat().sp.toPx()).toFloat() }
+        var y = 0f
+        val lineTops = FloatArray(laid.size)
+        val lineLefts = FloatArray(laid.size)
+        laid.forEachIndexed { i, line ->
+            val natural = line.size.height.toFloat()
+            val box = lineBox ?: natural
+            lineTops[i] = y + (box - natural) / 2
+            lineLefts[i] = when (align) {
+                TextAlign.Center -> (width - line.size.width) / 2f
+                TextAlign.End, TextAlign.Right -> (width - line.size.width).toFloat()
+                else -> 0f
+            }
+            y += box
+        }
+        lines[0] = laid
+        tops[0] = lineTops
+        lefts[0] = lineLefts
+        val baseline = laid.firstOrNull()?.let { (lineTops[0] + it.firstBaseline).roundToInt() } ?: 0
+        layout(width, y.roundToInt(), mapOf(FirstBaseline to baseline)) {}
+    }
 }
 
 /** Condensed poster type sized to exactly fill [width] (web `Poster`). */

@@ -13,7 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -37,8 +37,8 @@ import kotlin.math.min
 @Composable
 fun WrappedFrame(data: Wrapped, frame: Int, assets: WrappedAssets, modifier: Modifier = Modifier) {
     val timeline = remember(data) { WrappedTimeline.of(data) }
-    val context = LocalContext.current
-    val measure = remember(context) { PosterMeasure(context) }
+    val fonts = LocalFontFamilyResolver.current
+    val measure = remember(fonts) { PosterMeasure(fonts) }
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val outer = LocalDensity.current
         val scale = with(outer) { min(maxWidth.toPx() / WrappedTimeline.WIDTH, maxHeight.toPx() / WrappedTimeline.HEIGHT) }

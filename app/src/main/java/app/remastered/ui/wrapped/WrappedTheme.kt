@@ -1,15 +1,16 @@
 package app.remastered.ui.wrapped
 
-import android.content.Context
-import android.graphics.Paint
-import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
-import androidx.core.content.res.ResourcesCompat
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.sp
 import app.remastered.R
 import app.remastered.core.wrapped.TextWidth
 
@@ -58,18 +59,20 @@ object WrappedFonts {
 }
 
 /**
- * Measures poster type for fitText, with the same typeface Compose draws it in. Widths are
- * measured once per string at [TextWidth.SAMPLE_SIZE] and scaled, so fitting is cheap per frame.
+ * Measures poster type for fitText through the same Compose text stack that draws it, so the fit
+ * and the drawing can't disagree. Widths are measured once per string at a large size and scaled.
  */
-class PosterMeasure(context: Context) : TextWidth {
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = ResourcesCompat.getFont(context, R.font.wrapped_anton) ?: Typeface.DEFAULT
-        textSize = TextWidth.SAMPLE_SIZE.toFloat()
-    }
+class PosterMeasure(fontFamilyResolver: FontFamily.Resolver) : TextWidth {
+    private val measurer = TextMeasurer(fontFamilyResolver, Density(1f, 1f), LayoutDirection.Ltr, cacheSize = 0)
+    private val style = TextStyle(fontFamily = WrappedFonts.poster, fontSize = SAMPLE.sp)
     private val cache = HashMap<String, Double>()
 
     override fun width(text: String, fontSize: Double): Double {
-        val at100 = synchronized(cache) { cache.getOrPut(text) { paint.measureText(text).toDouble() } }
-        return at100 * fontSize / TextWidth.SAMPLE_SIZE
+        val atSample = cache.getOrPut(text) { measurer.measure(text, style, softWrap = false).multiParagraph.width.toDouble() }
+        return atSample * fontSize / SAMPLE
+    }
+
+    private companion object {
+        const val SAMPLE = 1000f
     }
 }
