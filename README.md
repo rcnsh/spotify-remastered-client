@@ -21,6 +21,10 @@ Spotify: it drives the installed, unmodified Spotify app.
   - Home's "On repeat" and "On this day", and "Your plays" on artist pages and in the song menu.
   - Stats: plays per day (7 days, 30 days, a year or any range), top artists, on repeat,
     streaks and listening by hour, top artists and songs per quarter and year, eras, top albums.
+  - Wrapped: a native port of [music-warehouse-wrapped](https://github.com/rcnsh/music-warehouse-wrapped)'s
+    story for each year (and the year so far): the same 14 slides, timing and motion, drawn
+    frame by frame in Compose. Tap, hold to pause, swipe down to close; each music slide plays
+    its song through Spotify from the chorus; share a frame or the summary card as a PNG.
 - Spotify keeps doing playback, DRM, downloads, the notification and Connect.
 
 Built with Kotlin and Jetpack Compose. Not affiliated with Spotify or Spicy Lyrics.
