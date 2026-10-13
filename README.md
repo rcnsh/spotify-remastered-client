@@ -16,6 +16,11 @@ Spotify: it drives the installed, unmodified Spotify app.
   [music-warehouse](https://github.com/rcnsh/music-warehouse), a Cloudflare Worker that keeps
   every play: History, Stats and Wrapped. Set its address and token in Settings → Listening
   history; the token is stored encrypted on the phone. Without one, those features stay hidden.
+  - History: every play, newest first, by day; jump to a date, pull to refresh. Plays newer
+    than the warehouse's last poll come from Spotify's recently-played.
+  - Home's "On repeat" and "On this day", and "Your plays" on artist pages and in the song menu.
+  - Stats: plays per day (7 days, 30 days, a year or any range), top artists, on repeat,
+    streaks and listening by hour, top artists and songs per quarter and year, eras, top albums.
 - Spotify keeps doing playback, DRM, downloads, the notification and Connect.
 
 Built with Kotlin and Jetpack Compose. Not affiliated with Spotify or Spicy Lyrics.

@@ -98,6 +98,7 @@ fun RemasteredRoot(container: AppContainer, lyricsPreview: MutableState<String?>
                     is Route.Artist -> ArtistScreen(app, route.id)
                     Route.Settings -> SettingsScreen(app)
                     Route.History -> HistoryScreen(app)
+                    is Route.HistoryDay -> HistoryScreen(app, route.day)
                     is Route.HistoryArtist -> HistoryArtistScreen(app, route.id, route.name)
                     is Route.HistoryTrack -> HistoryTrackScreen(app, route.id)
                     Route.Stats -> StatsScreen(app)
