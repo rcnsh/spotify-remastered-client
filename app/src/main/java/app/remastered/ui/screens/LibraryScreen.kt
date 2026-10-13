@@ -1,6 +1,8 @@
 package app.remastered.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,6 +29,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import app.remastered.core.model.best
 import app.remastered.ui.AppState
@@ -96,6 +100,12 @@ fun LibraryScreen(app: AppState) {
     var query by rememberSaveable { mutableStateOf("") }
     var creating by remember { mutableStateOf(false) }
     val likedCount = app.c.liked.tracks.value.size
+    val warehouse by app.c.warehouse.state.collectAsState()
+    // Listening history (music-warehouse), pinned under Liked Songs while it's set up.
+    val history = if (warehouse.isUsable) listOf(
+        HistoryEntry("Listening history", "Every play, from your warehouse", Icons.Queue, Route.History),
+        HistoryEntry("Stats", "On repeat, rhythm, top artists over time", Icons.Sort, Route.Stats),
+    ) else emptyList()
 
     val shown = remember(data.value, filter, sort, query) {
         val all = data.value.orEmpty().filter { item ->
@@ -152,6 +162,12 @@ fun LibraryScreen(app: AppState) {
             else CollectionRow("Liked Songs", subtitle, { LikedArt(Modifier.size(56.dp), RoundedCornerShape(10.dp)) }, { app.open(Route.LikedSongs) },
                 leadingSubIcon = Icons.Pin)
         }
+        if (showLiked) history.forEachIndexed { i, entry ->
+            item(span = { if (grid) GridItemSpan(1) else GridItemSpan(maxLineSpan) }) {
+                if (grid) GridCard(1 + i, entry.title, entry.subtitle, { IconArt(entry.icon, Modifier.fillMaxWidth().aspectRatio(1f), 14) }) { app.open(entry.route) }
+                else CollectionRow(entry.title, entry.subtitle, { IconArt(entry.icon, Modifier.size(56.dp), 10) }, { app.open(entry.route) })
+            }
+        }
         when (val s = data.state) {
             Load.Loading -> item(span = { GridItemSpan(maxLineSpan) }) { Loading() }
             is Load.Failed -> item(span = { GridItemSpan(maxLineSpan) }) { ErrorMessage(s.message, data.retry) }
@@ -159,7 +175,7 @@ fun LibraryScreen(app: AppState) {
                 itemsIndexed(shown, key = { _, it -> it.uri }) { index, item ->
                     val playing = app.isPlaying(item.uri)
                     val round = item.kind == LibKind.Artist
-                    if (grid) GridCard(index + (if (showLiked) 1 else 0), item.title, item.subtitle, {
+                    if (grid) GridCard(index + (if (showLiked) 1 + history.size else 0), item.title, item.subtitle, {
                         Artwork(item.imageUrl, Modifier.fillMaxWidth().aspectRatio(1f), if (round) CircleShape else RoundedCornerShape(14.dp))
                     }) { app.openUri(item.uri) }
                     else CollectionRow(item.title, item.subtitle,
@@ -174,6 +190,15 @@ fun LibraryScreen(app: AppState) {
         }
     }
     if (creating) CreatePlaylistDialog(app) { creating = false }
+}
+
+private data class HistoryEntry(val title: String, val subtitle: String, val icon: ImageVector, val route: Route)
+
+@Composable
+private fun IconArt(icon: ImageVector, modifier: Modifier, cornerDp: Int) {
+    Box(modifier.clip(RoundedCornerShape(cornerDp.dp)).background(Palette.raised), contentAlignment = Alignment.Center) {
+        Icon(icon, null, Modifier.size(26.dp), tint = Palette.accent)
+    }
 }
 
 @Composable

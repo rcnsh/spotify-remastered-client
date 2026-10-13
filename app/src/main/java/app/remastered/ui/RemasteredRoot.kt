@@ -32,6 +32,9 @@ import androidx.compose.ui.unit.dp
 import app.remastered.AppContainer
 import app.remastered.SpotifyServices
 import app.remastered.ui.components.fadeUp
+import app.remastered.ui.history.HistoryArtistScreen
+import app.remastered.ui.history.HistoryScreen
+import app.remastered.ui.history.HistoryTrackScreen
 import app.remastered.ui.lyrics.LyricsPreviewScreen
 import app.remastered.ui.lyrics.LyricsScreen
 import app.remastered.ui.player.AddToPlaylistSheet
@@ -49,8 +52,11 @@ import app.remastered.ui.screens.LikedSongsScreen
 import app.remastered.ui.screens.PlaylistScreen
 import app.remastered.ui.screens.SearchScreen
 import app.remastered.ui.screens.SettingsScreen
+import app.remastered.ui.stats.StatsScreen
 import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
+import app.remastered.ui.wrapped.WrappedScreen
+import app.remastered.ui.wrapped.WrappedStoryScreen
 
 /**
  * The whole UI for one [AppContainer]: sign-in if needed, then tabs, player and sheets.
@@ -91,12 +97,20 @@ fun RemasteredRoot(container: AppContainer, lyricsPreview: MutableState<String?>
                     is Route.Album -> AlbumScreen(app, route.id)
                     is Route.Artist -> ArtistScreen(app, route.id)
                     Route.Settings -> SettingsScreen(app)
+                    Route.History -> HistoryScreen(app)
+                    is Route.HistoryArtist -> HistoryArtistScreen(app, route.id, route.name)
+                    is Route.HistoryTrack -> HistoryTrackScreen(app, route.id)
+                    Route.Stats -> StatsScreen(app)
+                    Route.Wrapped -> WrappedScreen(app)
+                    is Route.WrappedStory -> WrappedStoryScreen(app, route.from, route.to)
                 }
             }
         }
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().fadeUp().padding(top = 28.dp).navigationBarsPadding()) {
-            MiniPlayer(app)
-            BottomBar(app)
+        if (app.nav.current !is Route.WrappedStory) {
+            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().fadeUp().padding(top = 28.dp).navigationBarsPadding()) {
+                MiniPlayer(app)
+                BottomBar(app)
+            }
         }
         AnimatedVisibility(app.nowPlayingOpen, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
             NowPlaying(app)

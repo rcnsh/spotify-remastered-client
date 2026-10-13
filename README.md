@@ -12,6 +12,10 @@ Spotify: it drives the installed, unmodified Spotify app.
   - words light up as they're sung, and tapping a line seeks there.
   - The provider and the people who synced the lyrics are credited under them.
   - Responses are cached for at most 30 days.
+- **Listening history** (optional) comes from your own
+  [music-warehouse](https://github.com/rcnsh/music-warehouse), a Cloudflare Worker that keeps
+  every play: History, Stats and Wrapped. Set its address and token in Settings → Listening
+  history; the token is stored encrypted on the phone. Without one, those features stay hidden.
 - Spotify keeps doing playback, DRM, downloads, the notification and Connect.
 
 Built with Kotlin and Jetpack Compose. Not affiliated with Spotify or Spicy Lyrics.
@@ -37,6 +41,10 @@ device.
    # Spicy Lyrics publishable key (sl_pk_…) with "Allow requests with no Origin header" on.
    # The build refuses a secret key (sl_sk_…). Without a key the app runs without lyrics.
    spicylyrics.key=
+   # Optional, debug builds only: start with this music-warehouse already set up (Settings →
+   # Listening history can change or remove it). Use the READ_TOKEN. Release builds never embed these.
+   warehouse.url=https://music-api.example.com
+   warehouse.readToken=
    ```
 3. `./gradlew :app:testDebugUnitTest :app:installDebug`
 

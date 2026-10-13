@@ -50,6 +50,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.remastered.Diagnostics
@@ -57,6 +59,8 @@ import app.remastered.RemasteredApp
 import app.remastered.core.AppSettings
 import app.remastered.core.Connection
 import app.remastered.core.model.best
+import app.remastered.core.warehouse.WarehouseException
+import app.remastered.core.warehouse.WarehouseState
 import app.remastered.spotify.web.RequestLog
 import app.remastered.ui.AppState
 import app.remastered.ui.Route
@@ -71,6 +75,7 @@ import app.remastered.ui.components.clearArtworkTints
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
+import app.remastered.warehouse.WarehouseConfig
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -96,6 +101,7 @@ fun SettingsScreen(app: AppState) {
         item { PlaybackGroup(app) }
         item { LibraryGroup(app) }
         item { LyricsGroup(app) }
+        item { WarehouseGroup(app) }
         item { StorageGroup(app) }
         item { Group("Developer", "Tools for building and debugging Remastered. Nothing here shows a token.") { DeveloperRows(app) { confirmReset = true } } }
         item { SessionGroup(app) }
@@ -225,6 +231,86 @@ private fun LyricsGroup(app: AppState) {
                 }
             })
         }
+    }
+}
+
+@Composable
+private fun WarehouseGroup(app: AppState) {
+    val warehouse = app.c.warehouse
+    val config by warehouse.config.collectAsState()
+    val state by warehouse.state.collectAsState()
+    val missing by warehouse.missing.collectAsState()
+    var url by remember(config) { mutableStateOf(config?.baseUrl.orEmpty()) }
+    // Never shown: blank means "keep the saved token".
+    var token by remember(config) { mutableStateOf("") }
+    var result by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    /** What's typed, falling back to the saved token; null (with a message) when it can't be used. */
+    fun entered(): WarehouseConfig? {
+        val base = WarehouseConfig.normalizeUrl(url) ?: run { result = "Enter the warehouse's https:// address."; return null }
+        val t = token.trim().ifEmpty { config?.token.orEmpty() }.ifEmpty { result = "Enter a token."; return null }
+        return WarehouseConfig(base, t)
+    }
+
+    fun test(cfg: WarehouseConfig) {
+        result = "Testing…"
+        scope.launch {
+            val start = System.nanoTime()
+            result = warehouse.test(cfg).fold(
+                { play ->
+                    "OK in ${(System.nanoTime() - start) / 1_000_000} ms. " +
+                        (play?.let { "Latest play: ${it.name} · ${it.artists}, ${PLAYED_AT.format(it.playedAt)}." } ?: "No plays stored yet.")
+                },
+                { e -> (e as? WarehouseException)?.let { "${it.userMessage}${it.status?.let { s -> " (HTTP $s)" }.orEmpty()}" } ?: "Failed." },
+            )
+        }
+    }
+
+    Group("Listening history", "Your play history from your own music-warehouse, for History, Stats and Wrapped. " +
+        "The token is stored encrypted on this phone and never shown or logged.") {
+        val status = when (val s = state) {
+            WarehouseState.NotConfigured -> "Not set up. History, Stats and Wrapped are hidden."
+            WarehouseState.Checking -> "Checking…"
+            WarehouseState.Ready -> "Connected."
+            WarehouseState.Unauthorized -> "Token rejected. Enter a new one."
+            is WarehouseState.Unreachable -> s.message
+        }
+        Item("Status", if (missing.isEmpty() || state !is WarehouseState.Ready) status
+            else "$status This warehouse doesn't serve ${missing.joinToString { it.name }} yet; those features stay hidden.")
+        Field(url, { url = it }, "https://music-api.example.com")
+        Field(token, { token = it }, if (config != null) "Token saved. Type to replace it." else "READ_TOKEN", secret = true)
+        FlowRow(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Chip("Save", true, {
+                entered()?.let { cfg ->
+                    warehouse.save(cfg)
+                    token = ""
+                    test(cfg)
+                }
+            })
+            Chip("Test connection", false, { entered()?.let(::test) })
+            if (config != null) Chip("Remove", false, {
+                warehouse.clear()
+                result = null
+                app.message("Warehouse removed")
+            })
+        }
+        result?.let { Mono(it) }
+    }
+}
+
+private val PLAYED_AT = java.time.format.DateTimeFormatter.ofPattern("d MMM HH:mm").withZone(java.time.ZoneId.systemDefault())
+
+/** A one-line text field in the style of the uri tool; [secret] masks what's typed. */
+@Composable
+private fun Field(value: String, onChange: (String) -> Unit, placeholder: String, secret: Boolean = false) {
+    Box(Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
+        .background(Palette.raised).padding(horizontal = 12.dp, vertical = 11.dp)) {
+        if (value.isEmpty()) Text(placeholder, style = MonoStyle, color = Palette.dim)
+        BasicTextField(value, onChange, singleLine = true, textStyle = MonoStyle.copy(color = Palette.text),
+            visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
+            cursorBrush = SolidColor(Palette.accent), modifier = Modifier.fillMaxWidth())
     }
 }
 

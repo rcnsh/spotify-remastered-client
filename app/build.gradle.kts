@@ -24,6 +24,11 @@ val spicyLyricsKey = localProp("spicylyrics.key").trim()
 check(!spicyLyricsKey.startsWith("sl_sk_")) {
     "spicylyrics.key in client/local.properties is a Spicy Lyrics secret key (sl_sk_…). Use a publishable key (sl_pk_…)."
 }
+// Listening history (music-warehouse): debug builds may start with warehouse.url and
+// warehouse.readToken from local.properties. Release builds never embed them; the user sets them
+// in Settings.
+val warehouseUrl = localProp("warehouse.url").trim()
+val warehouseToken = localProp("warehouse.readToken").trim()
 
 android {
     namespace = "app.remastered"
@@ -52,7 +57,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "WAREHOUSE_URL", "\"$warehouseUrl\"")
+            buildConfigField("String", "WAREHOUSE_TOKEN", "\"$warehouseToken\"")
+        }
         release {
+            buildConfigField("String", "WAREHOUSE_URL", "\"\"")
+            buildConfigField("String", "WAREHOUSE_TOKEN", "\"\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
