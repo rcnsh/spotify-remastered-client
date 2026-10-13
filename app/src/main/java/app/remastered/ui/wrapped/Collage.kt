@@ -422,13 +422,16 @@ fun Grain(frame: Int, opacity: Float = 0.5f) {
             isFilterBitmap = false
         }
     }
+    val matrix = remember { android.graphics.Matrix() }
     Canvas(Modifier.fillMaxSize()) {
         val step = floor(frame / 2.5).toInt()
         val dx = floor(random("gx$step") * 256).toFloat()
         val dy = floor(random("gy$step") * 256).toFloat()
         val unit = 1.dp.toPx()
         paint.alpha = (opacity * 255).roundToInt()
-        paint.shader.setLocalMatrix(android.graphics.Matrix().apply { setScale(unit, unit); postTranslate(dx * unit, dy * unit) })
+        matrix.setScale(unit, unit)
+        matrix.postTranslate(dx * unit, dy * unit)
+        paint.shader.setLocalMatrix(matrix)
         drawIntoCanvas { it.nativeCanvas.drawRect(0f, 0f, size.width, size.height, paint) }
     }
 }

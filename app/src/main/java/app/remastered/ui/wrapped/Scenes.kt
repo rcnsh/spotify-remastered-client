@@ -56,6 +56,10 @@ private inline fun DrawScope.onPlane(camera: Camera, model: Mat4, block: DrawSco
     }
 }
 
+private val discPath = annulus(0.16, 1.0)
+private val labelPath = annulus(0.16, 0.6)
+private val hubPath = annulus(0.13, 0.2)
+
 private fun annulus(inner: Double, outer: Double) = Path().apply {
     fillType = PathFillType.EvenOdd
     val o = (outer * UNIT).toFloat()
@@ -132,11 +136,11 @@ fun SlideFrame.HoloDisc(artUrl: String?, size: Int, modifier: Modifier = Modifie
             } else {
                 Brush.sweepGradient(listOf(Color(0xFFFF8FA3), Color(0xFFFFE08A), Color(0xFF9CFFB0), Color(0xFF8FD8FF), Color(0xFFC49BFF), Color(0xFFFF8FA3)), Offset.Zero)
             }
-            if (shader == null) drawPath(annulus(0.16, 1.0), Color(0xFFCCD1DB))
-            drawPath(annulus(0.16, 1.0), brush, alpha = if (shader == null) 0.6f else 1f)
-            val label = annulus(0.16, 0.6)
+            if (shader == null) drawPath(discPath, Color(0xFFCCD1DB))
+            drawPath(discPath, brush, alpha = if (shader == null) 0.6f else 1f)
+            val label = labelPath
             if (art != null) clipPath(label) { drawStretched(art, square(0.6)) } else drawPath(label, holoBlank)
-            drawPath(annulus(0.13, 0.2), holoHub)
+            drawPath(hubPath, holoHub)
         }
     }
 }
@@ -188,6 +192,8 @@ private val LIGHT = Vec3(3.0, 6.0, 4.0)
 fun SlideFrame.Turntable(hours: List<Int>, peakHour: Int, width: Int, height: Int, accent: Color, base: Color, modifier: Modifier = Modifier) {
     val f = frame.toDouble()
     val maxMinutes = max(1, hours.maxOrNull() ?: 0)
+    val path = remember { Path() }
+    val spindle = remember { Path().apply { fillType = PathFillType.EvenOdd } }
     Canvas(modifier.size(width.dp, height.dp)) {
         val camera = Camera(Vec3(0.0, 4.4, 6.6), 34.0, size.width, size.height)
         val group = Mat4.rotationY(interpolate(f, doubleArrayOf(0.0, 180.0), doubleArrayOf(0.6, -0.4)))
@@ -197,7 +203,7 @@ fun SlideFrame.Turntable(hours: List<Int>, peakHour: Int, width: Int, height: In
             val toCamera = camera.eye - center
             if ((normal dot toCamera) <= 0) return
             val shade = ThreeColor.standard(color, normal, toCamera, roughness, 0.7, 2.2, LIGHT)
-            val path = Path()
+            path.rewind()
             points.forEachIndexed { k, p ->
                 val (x, y) = camera.project(p)
                 if (k == 0) path.moveTo(x, y) else path.lineTo(x, y)
@@ -224,8 +230,8 @@ fun SlideFrame.Turntable(hours: List<Int>, peakHour: Int, width: Int, height: In
         face(ring.dropLast(1).map { group.point(Vec3(sin(it) * radius, 0.0, cos(it) * radius)) }, Vec3(0.0, 1.0, 0.0), platterColor, 0.5)
 
         // The spindle ring, flat on top.
-        val spindle = Path().apply {
-            fillType = PathFillType.EvenOdd
+        spindle.rewind(); spindle.fillType = PathFillType.EvenOdd
+        spindle.apply {
             for (r in listOf(0.36, 0.3)) {
                 (0 until 48).forEach { k ->
                     val a = 2 * PI * k / 48
@@ -268,6 +274,7 @@ fun SlideFrame.Turntable(hours: List<Int>, peakHour: Int, width: Int, height: In
 fun SlideFrame.Confetti(width: Int, height: Int, colors: List<Color>, count: Int = 70, seed: String = "confetti", modifier: Modifier = Modifier) {
     val t = frame / 30.0
     val shades = remember(colors) { colors.map { ThreeColor.basic(it) } }
+    val path = remember { Path() }
     Canvas(modifier.size(width.dp, height.dp)) {
         val camera = Camera(Vec3(0.0, 0.0, 10.0), 50.0, size.width, size.height)
         val pieces = (0 until count).map { i ->
@@ -279,7 +286,7 @@ fun SlideFrame.Confetti(width: Int, height: Int, colors: List<Color>, count: Int
             i to model
         }.sortedByDescending { (_, m) -> camera.depth(m.point(Vec3(0.0, 0.0, 0.0))) }
         for ((i, m) in pieces) {
-            val path = Path()
+            path.rewind()
             listOf(-1.0 to -1.0, 1.0 to -1.0, 1.0 to 1.0, -1.0 to 1.0).forEachIndexed { k, (sx, sy) ->
                 val (px, py) = camera.project(m.point(Vec3(sx * 0.16, sy * 0.09, 0.0)))
                 if (k == 0) path.moveTo(px, py) else path.lineTo(px, py)
