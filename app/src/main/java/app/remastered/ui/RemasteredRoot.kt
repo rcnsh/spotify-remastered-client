@@ -78,7 +78,7 @@ fun RemasteredRoot(container: AppContainer, lyricsPreview: MutableState<String?>
     wrappedPreview?.value?.let { preview ->
         BackHandler { wrappedPreview.value = null }
         WrappedStory(container, preview.from, preview.to, onClose = { wrappedPreview.value = null },
-            message = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }, startFrame = preview.frame, dump = preview.dump)
+            message = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }, startFrame = preview.frame, dump = preview.dump, export = preview.export)
         return
     }
     if (!SpotifyServices.isConfigured) {

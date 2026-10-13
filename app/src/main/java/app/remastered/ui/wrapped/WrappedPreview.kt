@@ -9,6 +9,8 @@ data class WrappedPreview(
     val frame: Int? = null,
     /** Frames to render off screen at 1080 × 1920 into the app's external files (`wrapped/`), for comparing stills. */
     val dump: List<Int>? = null,
+    /** Starts a video export at once: `silent`, or a song file's uri. */
+    val export: String? = null,
 ) {
     companion object {
         /** `2025-01-01:2025-12-31`, or null if it isn't a range. */

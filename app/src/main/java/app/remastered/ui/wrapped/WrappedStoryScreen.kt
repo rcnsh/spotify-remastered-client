@@ -1,7 +1,5 @@
 package app.remastered.ui.wrapped
 
-import app.remastered.BuildConfig
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -54,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.remastered.AppContainer
+import app.remastered.BuildConfig
 import app.remastered.core.Connection
 import app.remastered.core.warehouse.Wrapped
 import app.remastered.core.wrapped.WrappedTimeline
@@ -91,7 +90,7 @@ fun WrappedStoryScreen(app: AppState, from: LocalDate, to: LocalDate) =
  * [startFrame] opens it paused at that frame (debug, for comparing stills).
  */
 @Composable
-fun WrappedStory(c: AppContainer, from: LocalDate, to: LocalDate, onClose: () -> Unit, message: (String) -> Unit, startFrame: Int? = null, dump: List<Int>? = null) {
+fun WrappedStory(c: AppContainer, from: LocalDate, to: LocalDate, onClose: () -> Unit, message: (String) -> Unit, startFrame: Int? = null, dump: List<Int>? = null, export: String? = null) {
     val context = LocalContext.current
     var progress by remember(from, to) { mutableFloatStateOf(0f) }
     val story = load(from, to) {
@@ -115,7 +114,7 @@ fun WrappedStory(c: AppContainer, from: LocalDate, to: LocalDate, onClose: () ->
                         StoryLink("Close", onClose)
                     }
                 } else {
-                    StoryPlayer(c, data, assets, onClose, message, startFrame, dump)
+                    StoryPlayer(c, data, assets, onClose, message, startFrame, dump, export)
                 }
             }
         }
@@ -150,7 +149,7 @@ private fun StoryLoading(from: LocalDate, to: LocalDate, progress: Float, onClos
  * the story's FPS; the frame drawn is always WrappedFrame at an exact frame number.
  */
 @Composable
-private fun StoryPlayer(c: AppContainer, data: Wrapped, assets: WrappedAssets, onClose: () -> Unit, message: (String) -> Unit, startFrame: Int?, dump: List<Int>?) {
+private fun StoryPlayer(c: AppContainer, data: Wrapped, assets: WrappedAssets, onClose: () -> Unit, message: (String) -> Unit, startFrame: Int?, dump: List<Int>?, export: String?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val timeline = remember(data) { WrappedTimeline.of(data) }
@@ -161,6 +160,7 @@ private fun StoryPlayer(c: AppContainer, data: Wrapped, assets: WrappedAssets, o
     var seeks by remember { mutableIntStateOf(0) }
     var menu by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
+    var exporting by remember { mutableStateOf(export != null) }
     val renderer = rememberWrappedRenderer()
     val soundtrack = remember(data) {
         StorySoundtrack(c.player, c.catalog, c.lyricsSource, c.clock, c.scope, data, timeline)
@@ -217,7 +217,7 @@ private fun StoryPlayer(c: AppContainer, data: Wrapped, assets: WrappedAssets, o
         }
     }
 
-    if (dump != null) LaunchedEffect(dump) {
+    if (BuildConfig.DEBUG && dump != null) LaunchedEffect(dump) {
         val dir = java.io.File(context.getExternalFilesDir(null), "wrapped").apply { mkdirs() }
         for (f in dump) {
             val image = renderer.renderWrappedFrame(data, f, assets, WrappedTimeline.WIDTH, WrappedTimeline.HEIGHT)
@@ -229,6 +229,9 @@ private fun StoryPlayer(c: AppContainer, data: Wrapped, assets: WrappedAssets, o
         android.util.Log.i("WrappedDump", "done ${dump.size}")
     }
     WrappedRendererHost(renderer)
+    if (exporting) {
+        ExportDialog(renderer, data, assets, onDismiss = { exporting = false }, message = message, auto = export)
+    }
     Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.Center) {
         // The story fills the screen at 9:16, phone-style.
         Box(Modifier.aspectRatio(9f / 16f).clip(RoundedCornerShape(12.dp))) {
@@ -283,6 +286,7 @@ private fun StoryPlayer(c: AppContainer, data: Wrapped, assets: WrappedAssets, o
                     DropdownMenu(menu, { menu = false }) {
                         DropdownMenuItem({ Text("Share this frame") }, { menu = false; share(card = false) })
                         if (timeline.summaryCardFrame != null) DropdownMenuItem({ Text("Share summary card") }, { menu = false; share(card = true) })
+                        DropdownMenuItem({ Text("Export video…") }, { menu = false; paused = true; exporting = true })
                     }
                 }
                 Pill(Icons.Close, "Close", onClick = onClose)

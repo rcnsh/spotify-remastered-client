@@ -32,7 +32,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Renders [WrappedFrame] off screen, one frame at a time, at any pixel size: for share images now
- * and the MP4 exporter later. It composes the same [WrappedFrame] the story shows, so a rendered
+ * and the MP4 exporter. It composes the same [WrappedFrame] the story shows, so a rendered
  * frame is the frame on screen.
  *
  * Compose needs a live composition to draw in, so place [WrappedRendererHost] once in the screen
@@ -101,10 +101,10 @@ object WrappedShare {
         File(dir(context), "$name.png").also { file -> file.outputStream().use { image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) } }
     }
 
-    /** Opens the system share sheet for a PNG written by [savePng]. */
-    fun share(context: Context, file: File, title: String) {
+    /** Opens the system share sheet for a file in the app's cache: a PNG from [savePng], or a video. */
+    fun share(context: Context, file: File, title: String, mime: String = "image/png") {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.wrapped", file)
-        val send = Intent(Intent.ACTION_SEND).setType("image/png")
+        val send = Intent(Intent.ACTION_SEND).setType(mime)
             .putExtra(Intent.EXTRA_STREAM, uri)
             .putExtra(Intent.EXTRA_TITLE, title)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

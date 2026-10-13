@@ -16,6 +16,7 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_WRAPPED_PREVIEW = "wrapped_preview"
         const val EXTRA_WRAPPED_FRAME = "wrapped_frame"
         const val EXTRA_WRAPPED_DUMP = "wrapped_dump"
+        const val EXTRA_WRAPPED_EXPORT = "wrapped_export"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,11 +30,13 @@ class MainActivity : ComponentActivity() {
         // opens that range's Wrapped story from the warehouse (debug READ token), signed in or not;
         // with a frame, it opens paused there; `--es wrapped_dump 110,244` also renders those frames
         // to PNGs in the app's external files (wrapped/), for comparing with the web stills.
+        // `--es wrapped_export silent|<song uri>` starts a video export at once.
         val wrappedPreview = mutableStateOf(
-            intent.getStringExtra(EXTRA_WRAPPED_PREVIEW)?.takeIf { BuildConfig.DEBUG }?.let(WrappedPreview::parse)
+            (if (BuildConfig.DEBUG) intent.getStringExtra(EXTRA_WRAPPED_PREVIEW) else null)?.let(WrappedPreview::parse)
                 ?.copy(
                     frame = intent.getIntExtra(EXTRA_WRAPPED_FRAME, -1).takeIf { it >= 0 },
                     dump = intent.getStringExtra(EXTRA_WRAPPED_DUMP)?.split(',')?.mapNotNull { it.trim().toIntOrNull() },
+                    export = intent.getStringExtra(EXTRA_WRAPPED_EXPORT),
                 ),
         )
         setContent {
