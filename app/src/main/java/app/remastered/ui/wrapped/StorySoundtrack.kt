@@ -31,9 +31,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * Best effort and never in the story's way: nothing here blocks a frame, and if App Remote isn't
  * connected or a song can't be found the story just plays silently. On [restore] the user's own
- * playback comes back: the track they had, at the position they left it (its playlist or album
- * context can't be restored through App Remote, so it resumes as a single track), or a pause if
- * they weren't playing.
+ * playback comes back: the track they had, at the position they left it, playing or paused as it
+ * was (its playlist or album context can't be restored through App Remote, so it comes back as a
+ * single track), or a pause if nothing was loaded.
  */
 @Stable
 class StorySoundtrack(
@@ -79,12 +79,8 @@ class StorySoundtrack(
         job = scope.launch {
             val track = track(cue) ?: return@launch
             val start = hook(track)
-            player.play(track.uri)
             started = true
-            // Seek once Spotify has switched, or the seek lands on the previous song.
-            withTimeoutOrNull(4_000) { player.state.first { it?.track?.uri == track.uri } }
-            player.seekTo(start)
-            if (holding) player.pause()
+            playFrom(track.uri, start) { holding }
         }
     }
 
@@ -115,17 +111,27 @@ class StorySoundtrack(
     fun restore() {
         job?.cancel()
         if (!started) return
-        val track = before?.track
-        if (track != null && !before.isPaused) {
-            val at = before.positionAt(clock())
-            player.play(track.uri)
-            scope.launch {
-                withTimeoutOrNull(4_000) { player.state.first { it?.track?.uri == track.uri } }
-                player.seekTo(at)
-            }
-        } else {
-            player.pause()
+        val track = before?.track ?: return player.pause()
+        val at = before.positionAt(clock())
+        scope.launch { playFrom(track.uri, at) { before.isPaused } }
+    }
+
+    /**
+     * Plays [uri] from [atMs], or leaves it there paused if [paused]. App Remote can't load a track
+     * without playing it, so a paused track plays for the moment it takes Spotify to switch.
+     */
+    private suspend fun playFrom(uri: String, atMs: Long, paused: () -> Boolean) {
+        if (player.state.value?.track?.uri == uri) {
+            // Already loaded: playing it again would restart it from 0 after the seek.
+            player.seekTo(atMs)
+            if (paused()) player.pause() else player.resume()
+            return
         }
+        player.play(uri)
+        // Seek once Spotify has switched, or the seek lands on the previous song.
+        withTimeoutOrNull(4_000) { player.state.first { it?.track?.uri == uri } }
+        if (paused()) player.pause()
+        player.seekTo(atMs)
     }
 
     private suspend fun track(cue: SongCue): Track? = synchronized(tracks) {

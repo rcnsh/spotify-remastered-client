@@ -188,8 +188,11 @@ private fun StoryPlayer(c: AppContainer, data: Wrapped, assets: WrappedAssets, o
 
     val index = timeline.indexAt(frame)
     val connection by c.player.connection.collectAsState()
-    LaunchedEffect(Unit) { soundtrack.prefetch() }
-    LaunchedEffect(index) { soundtrack.onSlide(index) }
+    // Keyed on the connection too: a story opened before App Remote connects picks up its song
+    // once it does, instead of waiting for the next slide.
+    val connected = connection == Connection.Connected
+    LaunchedEffect(connected) { soundtrack.prefetch() }
+    LaunchedEffect(index, connected) { soundtrack.onSlide(index) }
     DisposableEffect(soundtrack) { onDispose { soundtrack.restore() } }
 
     fun go(to: Int) {
@@ -274,7 +277,7 @@ private fun StoryPlayer(c: AppContainer, data: Wrapped, assets: WrappedAssets, o
                 }
             }
             Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 20.dp).height(32.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (connection == Connection.Connected) {
+                if (connected) {
                     Pill(if (soundtrack.muted) Icons.VolumeLow else Icons.Volume, if (soundtrack.muted) "Unmute" else "Mute") { soundtrack.mute(!soundtrack.muted) }
                 }
                 if (paused) {
