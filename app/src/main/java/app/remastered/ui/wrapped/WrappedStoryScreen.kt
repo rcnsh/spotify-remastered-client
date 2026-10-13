@@ -59,7 +59,7 @@ import app.remastered.core.wrapped.WrappedTimeline
 import app.remastered.ui.AppState
 import app.remastered.ui.Load
 import app.remastered.ui.components.ErrorMessage
-import app.remastered.ui.load
+import app.remastered.ui.loadUncached
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
@@ -93,7 +93,7 @@ fun WrappedStoryScreen(app: AppState, from: LocalDate, to: LocalDate) =
 fun WrappedStory(c: AppContainer, from: LocalDate, to: LocalDate, onClose: () -> Unit, message: (String) -> Unit, startFrame: Int? = null, dump: List<Int>? = null, export: String? = null) {
     val context = LocalContext.current
     var progress by remember(from, to) { mutableFloatStateOf(0f) }
-    val story = load(from, to) {
+    val story = loadUncached(from, to) {
         val data = c.warehouse.api.wrapped(from, to)
         // Photos are decoration: never wait long for them, and don't ask without a session.
         val photos = if (c.spotify.signedIn) withTimeoutOrNull(8_000) { WrappedAssets.artistPhotos(c.catalog) }.orEmpty() else emptyMap()

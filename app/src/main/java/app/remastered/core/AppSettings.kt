@@ -22,6 +22,11 @@ class AppSettings(private val prefs: SharedPreferences) {
     val saveRecentSearches = Flag("save_recent_searches", true)
     /** Reconnect to the Spotify app (App Remote) when Remastered starts. */
     val autoConnect = Flag("auto_connect", true)
+    /**
+     * Remastered's own media notification (lock screen, Quick Settings) while something plays,
+     * which also keeps the App Remote connection alive with no window open.
+     */
+    val mediaNotification = Flag("media_notification", true)
     /** Load all Liked Songs in the background at start (for ♥ marks and the artist page). */
     val preloadLiked = Flag("preload_liked", true)
 

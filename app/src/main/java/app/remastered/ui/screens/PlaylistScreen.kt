@@ -47,7 +47,7 @@ private class PlaylistData(val playlist: Playlist, val items: List<PlaylistItem>
 
 @Composable
 fun PlaylistScreen(app: AppState, id: String) {
-    val data = load(id, app.playlistsVersion) {
+    val data = load(app.c.screens, "playlist:$id", app.playlistsVersion) {
         val p = app.c.catalog.playlist(id)
         // Spotify only returns items for playlists the user owns or collaborates on.
         val items = if (p.canReadItems(app.me)) allPages { app.c.catalog.playlistItems(id, it, 50) } else null

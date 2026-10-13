@@ -8,8 +8,10 @@ import app.remastered.core.Catalog
 import app.remastered.core.LikedIndex
 import app.remastered.core.Player
 import app.remastered.core.RecentSearches
+import app.remastered.core.ScreenCache
 import app.remastered.core.lyrics.CurrentLyrics
 import app.remastered.core.lyrics.LyricsSource
+import app.remastered.media.NowPlayingNotification
 import app.remastered.spicylyrics.LyricsCache
 import app.remastered.spicylyrics.SpicyLyrics
 import app.remastered.spicylyrics.SpicyLyricsApi
@@ -37,7 +39,12 @@ class AppContainer(val context: Context) {
     val catalog: Catalog = spotify.catalog
     val player: Player = spotify.player
 
+    /** Remastered's own media notification while something plays (Settings → Playback). */
+    val nowPlaying = NowPlayingNotification(context, player, settings.mediaNotification.value, scope)
+
     val liked = LikedIndex(catalog, scope)
+    /** What each screen loaded last, so switching between screens doesn't show a spinner every time. */
+    val screens = ScreenCache(clock)
     val recentSearches = RecentSearches(context.getSharedPreferences(PREFS_SEARCH, Context.MODE_PRIVATE)) { settings.saveRecentSearches.on }
 
     /** Spicy Lyrics responses, at most 30 days old (their terms). */
@@ -66,6 +73,7 @@ class AppContainer(val context: Context) {
     }
 
     fun close() {
+        nowPlaying.stop()
         player.disconnect()
         scope.cancel()
     }

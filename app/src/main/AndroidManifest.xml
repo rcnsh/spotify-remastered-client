@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The media notification (media/NowPlayingService) runs in the foreground while playing. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!-- Settings shows the installed Spotify app's version and can open it. -->
     <queries>
@@ -28,6 +31,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service
+            android:name=".media.NowPlayingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
         <!-- Wrapped share images (cache/wrapped/*.png), handed to the share sheet. -->
         <provider
             android:name="androidx.core.content.FileProvider"

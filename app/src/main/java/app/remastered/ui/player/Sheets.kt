@@ -126,7 +126,7 @@ fun TrackMenuSheet(app: AppState, menu: TrackMenu) {
 @Composable
 fun AddToPlaylistSheet(app: AppState) {
     val track = app.addToPlaylist ?: return
-    val playlists = load(app.playlistsVersion) { app.c.catalog.myPlaylists(0, 50).items.filter { it.canEdit(app.me) } }
+    val playlists = load(app.c.screens, "add-to-playlist", app.playlistsVersion) { app.c.catalog.myPlaylists(0, 50).items.filter { it.canEdit(app.me) } }
     val scope = rememberCoroutineScope()
     Sheet({ app.addToPlaylist = null }) {
         Text("Add to playlist", style = Type.sectionSmall, color = Palette.text, modifier = Modifier.padding(bottom = 12.dp))
@@ -176,7 +176,8 @@ private fun DeviceType.label() = when (this) {
 @Composable
 fun DevicesSheet(app: AppState) {
     var version by remember { mutableIntStateOf(0) }
-    val devices = load(version) { app.c.catalog.devices() }
+    // Devices change all the time: show the last list at once, but always check again.
+    val devices = load(app.c.screens, "devices", version, maxAgeMs = 0) { app.c.catalog.devices() }
     Sheet({ app.devicesOpen = false }) {
         Text("Connect to a device", style = Type.sectionSmall.copy(fontSize = 19.sp), color = Palette.text)
         when (val s = devices.state) {

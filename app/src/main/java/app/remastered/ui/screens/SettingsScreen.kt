@@ -149,7 +149,7 @@ private fun AccountCard(app: AppState) {
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (me != null) Chip("Open in Spotify", false, { app.viewUri("spotify:user:${me.id}") })
                 else Chip("Retry", false, { app.reloadProfile() })
-                Chip("Sign out", false, { app.c.spotify.signOut() })
+                Chip("Sign out", false, { app.c.screens.clear(); app.c.spotify.signOut() })
             }
         }
     }
@@ -174,6 +174,12 @@ private fun PlaybackGroup(app: AppState) {
             else Chip("Connect", true, { c.player.connect() })
         }
         Toggle("Connect when Remastered opens", "Otherwise, connect from here or the Home banner.", c.settings.autoConnect)
+        Toggle("Remastered notification", "Lock screen and Quick Settings controls that open Remastered. " +
+            "Keeps Remastered connected while music plays, with the app closed.", c.settings.mediaNotification)
+        Item("Spotify's notification", "Turn off its playback notification so only Remastered's shows", onClick = {
+            ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, Diagnostics.SPOTIFY_PACKAGE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }) { Chevron() }
         Item("Devices", "Spotify Connect speakers, computers and TVs", onClick = { app.devicesOpen = true }) { Chevron() }
         Item("Open the Spotify app", Diagnostics.spotifyVersion(ctx)?.let { "Version $it" } ?: "Not installed", onClick = {
             ctx.packageManager.getLaunchIntentForPackage(Diagnostics.SPOTIFY_PACKAGE)?.let { ctx.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }

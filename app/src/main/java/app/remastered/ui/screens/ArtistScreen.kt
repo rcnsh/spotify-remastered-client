@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import app.remastered.core.model.Album
 import app.remastered.core.model.AlbumGroup
 import app.remastered.core.model.Artist
+import app.remastered.core.model.Page
 import app.remastered.core.model.best
 import app.remastered.ui.AppState
 import app.remastered.ui.Load
@@ -67,7 +69,7 @@ import app.remastered.ui.theme.Type
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
-private class ArtistData(val artist: Artist, val discography: Map<AlbumGroup, List<Album>>)
+private class ArtistData(val artist: Artist, val discography: Map<AlbumGroup, Page<Album>>)
 
 private val DiscographyTabs = listOf(AlbumGroup.Album to "Albums", AlbumGroup.Single to "Singles & EPs", AlbumGroup.Compilation to "Compilations")
 
@@ -77,14 +79,14 @@ private val DiscographyTabs = listOf(AlbumGroup.Album to "Albums", AlbumGroup.Si
  */
 @Composable
 fun ArtistScreen(app: AppState, id: String) {
-    val data = load(id) {
+    val data = load(app.c.screens, "artist:$id", maxAgeMs = 10 * 60_000) {
         coroutineScope {
             val artist = async { app.c.catalog.artist(id) }
             val groups = (DiscographyTabs.map { it.first } + AlbumGroup.AppearsOn).map { g ->
                 g to async {
-                    runCatching { app.c.catalog.artistAlbums(id, setOf(g), 0, 10).items }
+                    runCatching { app.c.catalog.artistAlbums(id, setOf(g), 0, 10) }
                         .onFailure { Log.w("ArtistScreen", "Discography ${g.api} failed: ${it.javaClass.simpleName} ${it.message}") }
-                        .getOrDefault(emptyList())
+                        .getOrDefault(Page.of(emptyList()))
                 }
             }
             ArtistData(artist.await(), groups.associate { (g, d) -> g to d.await() })
@@ -112,7 +114,20 @@ private fun ArtistBody(app: AppState, d: ArtistData, list: LazyListState) {
     val following = app.rememberSaved(a.uri)
     val shuffle = app.shuffleOn()
     var showMine by rememberSaveable(a.id) { mutableStateOf(false) }
-    var tab by rememberSaveable(a.id) { mutableStateOf(DiscographyTabs.firstOrNull { d.discography[it.first].orEmpty().isNotEmpty() }?.first ?: AlbumGroup.Album) }
+    // The API serves 10 releases per request, so each tab's row fetches the next page as it
+    // nears its end; the cached ArtistData keeps only the first page.
+    val disco = remember(a.id) { mutableStateMapOf<AlbumGroup, Page<Album>>().apply { putAll(d.discography) } }
+    var tab by rememberSaveable(a.id) { mutableStateOf(DiscographyTabs.firstOrNull { disco[it.first]?.items.orEmpty().isNotEmpty() }?.first ?: AlbumGroup.Album) }
+    val row = remember(a.id, tab) { LazyListState() }
+    val nearEnd by remember(row) { derivedStateOf { (row.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= row.layoutInfo.totalItemsCount - 3 } }
+    val loaded = disco[tab]?.items?.size ?: 0
+    LaunchedEffect(tab, nearEnd, loaded) {
+        val p = disco[tab] ?: return@LaunchedEffect
+        if (!nearEnd || !p.hasMore) return@LaunchedEffect
+        runCatching { app.c.catalog.artistAlbums(a.id, setOf(tab), p.items.size, 10) }
+            .onSuccess { next -> disco[tab] = Page((p.items + next.items).distinctBy { it.id }, 0, next.total, next.hasMore && next.items.isNotEmpty()) }
+            .onFailure { Log.w("ArtistScreen", "Discography ${tab.api} page failed: ${it.javaClass.simpleName} ${it.message}") }
+    }
 
     LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = ScreenPadding) {
         item(key = "hero") {
@@ -166,22 +181,22 @@ private fun ArtistBody(app: AppState, d: ArtistData, list: LazyListState) {
                     playing = player?.track?.uri == t.uri, liked = true)
             }
         }
-        val shown = d.discography[tab].orEmpty()
-        if (DiscographyTabs.any { d.discography[it.first].orEmpty().isNotEmpty() }) item(key = "disco") {
+        val shown = disco[tab]?.items.orEmpty()
+        if (DiscographyTabs.any { disco[it.first]?.items.orEmpty().isNotEmpty() }) item(key = "disco") {
             Column(Modifier.padding(top = 30.dp)) {
                 SectionHeader("Discography", small = true)
                 LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 14.dp)) {
-                    items(DiscographyTabs.filter { d.discography[it.first].orEmpty().isNotEmpty() }, key = { it.first }) { (g, label) ->
+                    items(DiscographyTabs.filter { disco[it.first]?.items.orEmpty().isNotEmpty() }, key = { it.first }) { (g, label) ->
                         Chip(label, selected = g == tab, onClick = { tab = g })
                     }
                 }
-                LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(top = 16.dp)) {
+                LazyRow(state = row, contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(top = 16.dp)) {
                     items(shown, key = { it.id }) { al ->
                         Card(al.name, al.year, al.images.best()?.url, { app.open(Route.Album(al.id)) })
                     }
                 }
             }
         }
-        albumCarousel(app, "Appears on", d.discography[AlbumGroup.AppearsOn].orEmpty())
+        albumCarousel(app, "Appears on", d.discography[AlbumGroup.AppearsOn]?.items.orEmpty())
     }
 }

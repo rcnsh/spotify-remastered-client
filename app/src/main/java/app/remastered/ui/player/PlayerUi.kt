@@ -270,26 +270,34 @@ fun NowPlaying(app: AppState, modifier: Modifier = Modifier) {
                         IconButton(Icons.Share, "Share", { app.share(track.uri, track.name) }, tint = Color.White.copy(alpha = .8f), iconSize = 20.dp)
                         IconButton(Icons.Queue, "Queue", { app.queueOpen = true }, tint = Color.White.copy(alpha = .8f), iconSize = 20.dp)
                     }
-                    Spacer(Modifier.weight(1f))
-                    queue?.upNext?.firstOrNull()?.let { next ->
-                        Column(Modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-                            .background(Palette.base.copy(alpha = .72f)).clickable { app.queueOpen = true }.padding(top = 14.dp, bottom = 6.dp)) {
-                            Row(Modifier.padding(horizontal = 16.dp)) {
-                                Text("Up next", style = Type.body.copy(fontWeight = Type.section.fontWeight), color = Palette.text, modifier = Modifier.weight(1f))
-                                Text("Queue", style = Type.label, color = Palette.sub)
-                            }
-                            Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Artwork(next.album?.images?.firstOrNull()?.url, Modifier.size(40.dp), RoundedCornerShape(8.dp))
-                                Column(Modifier.padding(start = 12.dp)) {
-                                    TitleText(next.name)
-                                    SubText(next.artistNames)
-                                }
-                            }
-                        }
+                    // Without lyrics the page doesn't scroll, so Up next sits at its foot.
+                    if (!showLyrics) {
+                        Spacer(Modifier.weight(1f))
+                        UpNextCard(app, queue, tint, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp))
                     }
                 }
             }
+            if (showLyrics) UpNextCard(app, queue, tint, Modifier.padding(horizontal = 12.dp))
             if (showLyrics) LyricsCard(app, positionState, tint, Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 24.dp))
+        }
+    }
+}
+
+@Composable
+private fun UpNextCard(app: AppState, queue: Queue?, tint: Color, modifier: Modifier = Modifier) {
+    val next = queue?.upNext?.firstOrNull() ?: return
+    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(lerp(tint, Palette.base, .62f))
+        .clickable(onClickLabel = "Open queue") { app.queueOpen = true }.padding(vertical = 16.dp)) {
+        Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Up next", style = Type.sectionSmall, color = Palette.text, modifier = Modifier.weight(1f))
+            Text("Queue", style = Type.label, color = Color.White.copy(alpha = .7f))
+        }
+        Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Artwork(next.album?.images?.firstOrNull()?.url, Modifier.size(44.dp), RoundedCornerShape(8.dp))
+            Column(Modifier.padding(start = 12.dp)) {
+                TitleText(next.name)
+                SubText(next.artistNames)
+            }
         }
     }
 }

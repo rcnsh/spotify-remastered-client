@@ -40,17 +40,31 @@ data class Lyrics(
     }
 }
 
+/** A row in the lyrics list: a sung [LyricLine], or an [Interlude] between lines. */
+sealed interface LyricRow {
+    val startMs: Long
+    val endMs: Long
+}
+
 data class LyricLine(
-    val startMs: Long,
+    override val startMs: Long,
     /** Includes background vocals that end after the lead. */
-    val endMs: Long,
+    override val endMs: Long,
     val lead: Vocal,
     /** Backing vocals sung alongside [lead], shown smaller underneath. */
     val background: List<Vocal> = emptyList(),
     /** Sung by a second voice: drawn on the opposite side. */
     val oppositeAligned: Boolean = false,
     val translation: String? = null,
-)
+) : LyricRow
+
+/** A long gap with no singing (an intro or an instrumental break), shown as three dots. */
+data class Interlude(
+    override val startMs: Long,
+    override val endMs: Long,
+    /** Follows the line after it, so the dots sit where the next voice will sing. */
+    val oppositeAligned: Boolean = false,
+) : LyricRow
 
 data class Vocal(
     val startMs: Long,

@@ -41,7 +41,7 @@ import app.remastered.ui.theme.Type
  */
 @Composable
 fun WrappedScreen(app: AppState) {
-    val ranges = load(Unit) { app.c.warehouse.api.wrappedRanges() }
+    val ranges = load(app.c.screens, "wrapped-ranges", maxAgeMs = 10 * 60_000) { app.c.warehouse.api.wrappedRanges() }
     LazyColumn(Modifier.fillMaxSize().background(Palette.base), contentPadding = ScreenPadding) {
         item { TopBar(app, title = "Your Wrapped", solid = true) }
         item {
