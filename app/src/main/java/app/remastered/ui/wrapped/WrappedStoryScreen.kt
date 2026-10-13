@@ -1,5 +1,7 @@
 package app.remastered.ui.wrapped
 
+import app.remastered.BuildConfig
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -167,12 +169,18 @@ private fun StoryPlayer(c: AppContainer, data: Wrapped, assets: WrappedAssets, o
     LaunchedEffect(paused, seeks) {
         if (paused) return@LaunchedEffect
         val startFrame = frame
+        val generation = seeks
         var start = -1L
         while (frame < last) {
-            withFrameNanos { now ->
+            // A tap can seek between this loop's frame callback being queued and the effect
+            // restarting; a stale callback must not write over the new position.
+            val current = withFrameNanos { now ->
+                if (paused || seeks != generation) return@withFrameNanos false
                 if (start < 0) start = now
                 frame = min(last, startFrame + ((now - start) * WrappedTimeline.FPS / 1_000_000_000L).toInt())
+                true
             }
+            if (!current) return@LaunchedEffect
         }
         // The web story leaves at the end; here it rests on the summary so it can be shared.
         paused = true
@@ -185,6 +193,7 @@ private fun StoryPlayer(c: AppContainer, data: Wrapped, assets: WrappedAssets, o
     DisposableEffect(soundtrack) { onDispose { soundtrack.restore() } }
 
     fun go(to: Int) {
+        if (BuildConfig.DEBUG) android.util.Log.d("WrappedStory", "go ${to.coerceIn(0, timeline.slides.lastIndex)} from $frame")
         frame = timeline.startOf(to)
         paused = false
         seeks++
