@@ -82,3 +82,10 @@ adb shell am start -n app.remastered/.MainActivity --es wrapped_preview 2025-01-
 `--ei wrapped_frame 423` opens it paused at a frame, `--es wrapped_dump 110,244` renders frames
 to PNGs in the app's external files (`wrapped/`), and `--es wrapped_export silent` (or a song
 file's uri) starts a video export. In the app it's under Settings → Wrapped preview.
+
+## Docs
+
+- `docs/decisions/`: why it works this way (ADRs).
+- `docs/design/mockups/`: the design the screens follow.
+- `docs/PLAN.md`: what is built and what is open.
+- `scripts/emulator.sh`: boots the dev emulator, for previews that don't need Spotify.
