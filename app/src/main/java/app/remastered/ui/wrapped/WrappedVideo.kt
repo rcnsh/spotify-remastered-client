@@ -339,7 +339,8 @@ suspend fun exportWrappedVideo(
                 }
                 out >= 0 -> {
                     val buffer = codec.getOutputBuffer(out)!!
-                    if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && info.size > 0) {
+                    // Past the last frame is only the padding copy (below).
+                    if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && info.size > 0 && videoOut < frames) {
                         check(muxing) { "Video data before its format" }
                         // The surface stamps frames with the wall clock; the video's own clock is
                         // the frame number. B-frames are off, so output order is frame order.
@@ -358,8 +359,12 @@ suspend fun exportWrappedVideo(
     try {
         val paint = Paint(Paint.FILTER_BITMAP_FLAG)
         val target = Rect(0, 0, VideoExport.WIDTH, VideoExport.HEIGHT)
-        for (frame in 0 until frames) {
+        // One frame more than the story: an input surface drops a frame still queued when the end
+        // of stream arrives (seen on a Pixel 10 Pro: one export in two lost its last frame), so
+        // the last frame goes in twice and only the first [frames] outputs are written.
+        for (n in 0..frames) {
             ensureActive()
+            val frame = min(n, frames - 1)
             val image = renderer.renderWrappedFrame(data, frame, assets, VideoExport.WIDTH, VideoExport.HEIGHT)
             val bitmap = image.asAndroidBitmap()
             val canvas = surface.lockHardwareCanvas()
