@@ -21,6 +21,8 @@ sealed interface Route {
     // ui.stats, ui.wrapped) so features can grow without touching each other.
     /** Every play, newest first. */
     data object History : Route
+    /** History starting at [day] (local), newest first from the end of that day. */
+    data class HistoryDay(val day: LocalDate) : Route
     /** One artist in the history; [id] may be null for artists only known by name. */
     data class HistoryArtist(val id: String?, val name: String) : Route
     /** One track in the history, by Spotify track id. */

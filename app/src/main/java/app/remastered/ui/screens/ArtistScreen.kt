@@ -59,6 +59,7 @@ import app.remastered.ui.components.SectionHeader
 import app.remastered.ui.components.SubText
 import app.remastered.ui.components.TitleText
 import app.remastered.ui.components.TrackRow
+import app.remastered.ui.history.YourPlays
 import app.remastered.ui.load
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
@@ -135,6 +136,7 @@ private fun ArtistBody(app: AppState, d: ArtistData, list: LazyListState) {
                 PlayButton(app.isPlaying(a.uri), { app.togglePlay(a.uri) })
             }
         }
+        item(key = "your-plays") { YourPlays(app, a.id, a.name) }
         if (mine.isNotEmpty()) {
             item(key = "mine") {
                 Column(Modifier.padding(top = 22.dp)) {
