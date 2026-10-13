@@ -76,7 +76,7 @@ private data class LibItem(
  */
 @Composable
 fun LibraryScreen(app: AppState) {
-    val data = load(app.playlistsVersion, app.me?.id) {
+    val data = load(app.c.screens, "library", app.playlistsVersion, app.me?.id) {
         coroutineScope {
             val c = app.c.catalog
             val playlists = async { allPages(1_000) { c.myPlaylists(it, 50) } }

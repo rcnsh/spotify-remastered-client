@@ -42,7 +42,7 @@ private class AlbumData(val album: Album, val tracks: List<Track>, val artist: A
 
 @Composable
 fun AlbumScreen(app: AppState, id: String) {
-    val data = load(id) {
+    val data = load(app.c.screens, "album:$id", maxAgeMs = 10 * 60_000) {
         coroutineScope {
             val detail = app.c.catalog.album(id)
             val a = detail.album

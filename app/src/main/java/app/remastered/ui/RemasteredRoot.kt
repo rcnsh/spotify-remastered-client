@@ -64,10 +64,16 @@ import app.remastered.ui.wrapped.WrappedStoryScreen
 /**
  * The whole UI for one [AppContainer]: sign-in if needed, then tabs, player and sheets.
  * [lyricsPreview] (debug builds only, see MainActivity) shows that track's lyrics preview first,
- * signed in or not; [wrappedPreview] likewise opens a Wrapped story.
+ * signed in or not; [wrappedPreview] likewise opens a Wrapped story. [openNowPlaying] is set when
+ * the media notification is tapped.
  */
 @Composable
-fun RemasteredRoot(container: AppContainer, lyricsPreview: MutableState<String?>? = null, wrappedPreview: MutableState<WrappedPreview?>? = null) {
+fun RemasteredRoot(
+    container: AppContainer,
+    lyricsPreview: MutableState<String?>? = null,
+    wrappedPreview: MutableState<WrappedPreview?>? = null,
+    openNowPlaying: MutableState<Boolean>? = null,
+) {
     val context = LocalContext.current
     val spotify = container.spotify
     lyricsPreview?.value?.let { uri ->
@@ -91,6 +97,15 @@ fun RemasteredRoot(container: AppContainer, lyricsPreview: MutableState<String?>
     }
     val app = remember(container) { AppState(container, context.applicationContext) }
     LaunchedEffect(app) { app.start() }
+    LaunchedEffect(app, openNowPlaying?.value) {
+        if (openNowPlaying?.value != true) return@LaunchedEffect
+        openNowPlaying.value = false
+        if (container.player.state.value?.track == null) return@LaunchedEffect
+        app.menu = null
+        app.queueOpen = false
+        app.lyricsOpen = false
+        app.nowPlayingOpen = true
+    }
 
     BackHandler(enabled = app.canGoBack) { app.back() }
 

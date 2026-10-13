@@ -1,6 +1,13 @@
 package app.remastered.ui.lyrics
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -46,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -66,6 +74,7 @@ import app.remastered.AppContainer
 import app.remastered.core.NowPlaying
 import app.remastered.core.PlaybackState
 import app.remastered.core.lyrics.CreditPart
+import app.remastered.core.lyrics.Interlude
 import app.remastered.core.lyrics.LineState
 import app.remastered.core.lyrics.LyricLine
 import app.remastered.core.lyrics.Lyrics
@@ -87,24 +96,28 @@ import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
 import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.sin
 
 private val Bright = Color.White
 private val Dim = Color.White.copy(alpha = .36f)
 private val Sung = Color.White.copy(alpha = .6f)
 
-private class LyricStyle(val lead: TextStyle, val background: TextStyle, val extra: TextStyle, val gap: Dp)
+private class LyricStyle(val lead: TextStyle, val background: TextStyle, val extra: TextStyle, val gap: Dp, val dot: Dp)
 
 private val Full = LyricStyle(
     lead = Type.headline.copy(fontSize = 27.sp, lineHeight = 35.sp),
     background = Type.headline.copy(fontSize = 19.sp, lineHeight = 25.sp, fontWeight = FontWeight(700)),
     extra = Type.bodyRegular.copy(fontSize = 15.sp, lineHeight = 20.sp),
     gap = 18.dp,
+    dot = 12.dp,
 )
 private val Compact = LyricStyle(
     lead = Type.headline.copy(fontSize = 21.sp, lineHeight = 28.sp),
     background = Type.headline.copy(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight(700)),
     extra = Type.caption,
     gap = 10.dp,
+    dot = 9.dp,
 )
 
 /** The playback position plus the user's timing offset, as lyrics see it. */
@@ -116,8 +129,8 @@ private fun rememberLyricsTime(c: AppContainer, position: State<Long>): State<Lo
 
 /**
  * Lyrics lines that follow [time]: the current line is kept in view, word-synced lines light up
- * syllable by syllable. Tapping a line seeks there when [onSeek] is given. Only active lines read
- * [time], so a frame recomposes one or two lines, not the list.
+ * syllable by syllable, and long gaps show bouncing dots. Tapping a line seeks there when [onSeek]
+ * is given. Only active rows read [time], so a frame recomposes one or two rows, not the list.
  */
 @Composable
 private fun LyricLines(
@@ -134,8 +147,9 @@ private fun LyricLines(
     footer: (@Composable () -> Unit)? = null,
 ) {
     val synced = lyrics.sync != Lyrics.Sync.Static
-    val states by remember(lyrics, time) { derivedStateOf { if (synced) LyricsTimeline.states(lyrics.lines, time.value) else null } }
-    val focus by remember(lyrics, time) { derivedStateOf { if (synced) LyricsTimeline.focus(lyrics.lines, time.value) else -1 } }
+    val rows = remember(lyrics) { if (synced) LyricsTimeline.withInterludes(lyrics.lines) else lyrics.lines }
+    val states by remember(rows, time) { derivedStateOf { if (synced) LyricsTimeline.states(rows, time.value) else null } }
+    val focus by remember(rows, time) { derivedStateOf { if (synced) LyricsTimeline.focus(rows, time.value) else -1 } }
     var placed by remember(lyrics) { mutableStateOf(false) }
     LaunchedEffect(lyrics, focus, follow) {
         if (!follow || focus < 0) return@LaunchedEffect
@@ -144,9 +158,12 @@ private fun LyricLines(
         placed = true
     }
     LazyColumn(modifier, listState, contentPadding, userScrollEnabled = userScroll) {
-        itemsIndexed(lyrics.lines) { i, line ->
-            LineView(line, lyrics.sync, states?.getOrNull(i), time, style, showExtras,
-                onClick = if (synced && onSeek != null) ({ onSeek(line.startMs) }) else null)
+        itemsIndexed(rows) { i, row ->
+            when (row) {
+                is LyricLine -> LineView(row, lyrics.sync, states?.getOrNull(i), time, style, showExtras,
+                    onClick = if (synced && onSeek != null) ({ onSeek(row.startMs) }) else null)
+                is Interlude -> InterludeView(row, states?.getOrNull(i), time, style)
+            }
         }
         footer?.let { item { it() } }
     }
@@ -181,6 +198,50 @@ private fun LineView(
             }
             line.translation?.let {
                 Text(it, style = style.extra, color = extraColor, textAlign = textAlign, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+    }
+}
+
+/** How long one wave of the dots' bounce takes, first dot up to last dot down. */
+private const val BouncePeriodMs = 1_400f
+
+/**
+ * Three dots over an intro or instrumental break, shown only while it plays. They light up one
+ * after another across the gap and bounce in turn, on the playback clock, so they rest when paused.
+ */
+@Composable
+private fun InterludeView(interlude: Interlude, state: LineState?, time: State<Long>, style: LyricStyle) {
+    val t = if (state == LineState.Active) time.value else null
+    val visible = t != null && t < interlude.endMs - LyricsTimeline.InterludeHideMs
+    val end = interlude.oppositeAligned
+    AnimatedVisibility(
+        visible,
+        Modifier.fillMaxWidth(),
+        enter = expandVertically(tween(350)) + fadeIn(tween(350)) + scaleIn(tween(350), initialScale = .6f),
+        exit = shrinkVertically(tween(350)) + fadeOut(tween(250)) + scaleOut(tween(350), targetScale = .6f),
+    ) {
+        val lit = if (t != null) LyricsTimeline.dots(interlude, t) else List(3) { 1f }
+        // Where the wave is, 0 to 1. Each dot rises and falls over the 40% of it starting at its turn.
+        val wave = if (t != null) ((t - interlude.startMs) % BouncePeriodMs.toLong()) / BouncePeriodMs else 0f
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = style.gap / 2 + style.dot / 2)
+                .semantics { contentDescription = "Instrumental" },
+            horizontalArrangement = Arrangement.spacedBy(style.dot * .7f, if (end) Alignment.End else Alignment.Start),
+        ) {
+            lit.forEachIndexed { i, fill ->
+                val phase = wave - i * .2f
+                val lift = if (phase in 0f..<.4f) sin(PI * phase / .4f).toFloat() else 0f
+                Box(
+                    Modifier.size(style.dot)
+                        .graphicsLayer {
+                            translationY = -lift * style.dot.toPx() * .7f
+                            val grow = .85f + .15f * fill
+                            scaleX = grow; scaleY = grow
+                        }
+                        .clip(CircleShape)
+                        .background(lerp(Dim, Bright, fill)),
+                )
             }
         }
     }

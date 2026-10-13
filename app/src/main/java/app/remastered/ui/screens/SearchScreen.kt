@@ -155,7 +155,7 @@ private fun RecentList(app: AppState) {
 
 @Composable
 private fun Genres(app: AppState, onGenre: (String) -> Unit) {
-    val genres = load(Unit) {
+    val genres = load(app.c.screens, "genres", maxAgeMs = 30 * 60_000) {
         val artists = app.c.catalog.topArtists(TimeRange.Medium, 30)
         // Most common genres across top artists, with the art of the first artist in each.
         artists.flatMap { a -> a.genres.map { it to a } }.groupBy({ it.first }, { it.second })
@@ -198,7 +198,7 @@ private fun LazyListScope.results(app: AppState, query: String, tab: SearchTab, 
 
 @Composable
 private fun Results(app: AppState, query: String, tab: SearchTab) {
-    val results = load(query, tab) {
+    val results = load(app.c.screens, "search:$tab:$query", maxAgeMs = 5 * 60_000) {
         delay(300) // debounce typing
         val types = tab.type?.let(::setOf) ?: SearchType.entries.toSet()
         app.c.catalog.search(query, types, 0, 10)

@@ -23,11 +23,13 @@ class WebCatalogTest {
     private val server = MockWebServer()
     private val tokens = FakeTokens()
     private val sleeps = mutableListOf<Long>()
+    private var now = 1_000_000L
+    private val limitStore = RateLimits.InMemory()
     private lateinit var catalog: WebCatalog
 
     @Before fun setUp() {
         server.start()
-        catalog = WebCatalog(OkHttpClient(), tokens, server.url("/v1/").toString(), sleep = { sleeps += it })
+        catalog = WebCatalog(OkHttpClient(), tokens, server.url("/v1/").toString(), sleep = { sleeps += it }, limits = RateLimits(limitStore) { now })
     }
 
     @After fun tearDown() = server.close()
@@ -96,6 +98,34 @@ class WebCatalogTest {
         assertEquals(429, e.status)
         assertTrue(sleeps.isEmpty())
         assertEquals(1, server.requestCount)
+    }
+
+    @Test fun `429 with long Retry-After stops requests to that endpoint until it passes`() = runTest {
+        enqueue("", 429, mapOf("Retry-After" to "30630"))
+        assertEquals(30_630_000L, assertThrows { catalog.likedTracks() }.retryAfterMs)
+
+        now += 630_000
+        val e = assertThrows { catalog.likedTracks(50) }
+        assertTrue(e.isRateLimited)
+        assertEquals(30_000_000L, e.retryAfterMs)
+        assertEquals(1, server.requestCount)
+        assertEquals(1_000_000L + 30_630_000L, limitStore.load()["/v1/me/tracks"])
+
+        // Other endpoints are unaffected.
+        enqueue("""{"id":"u1"}""")
+        assertEquals("u1", catalog.me().id)
+
+        now += 30_000_000
+        enqueue("""{"items":[],"total":0}""")
+        assertEquals(0, catalog.likedTracks().items.size)
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test fun `a limit from an earlier run is honoured`() = runTest {
+        limitStore.save(mapOf("/v1/me/tracks" to now + 5_000))
+        catalog = WebCatalog(OkHttpClient(), tokens, server.url("/v1/").toString(), sleep = { sleeps += it }, limits = RateLimits(limitStore) { now })
+        assertEquals(5_000L, assertThrows { catalog.likedTracks() }.retryAfterMs)
+        assertEquals(0, server.requestCount)
     }
 
     @Test fun `network failure has null status`() = runTest {

@@ -67,14 +67,30 @@ interface Catalog {
     suspend fun reorderPlaylist(playlistId: String, rangeStart: Int, insertBefore: Int, snapshotId: String?): String
 }
 
-/** A Web API failure the UI can show. [status] is the HTTP status, or null for network errors. */
+/**
+ * A Web API failure the UI can show. [status] is the HTTP status, or null for network errors.
+ * [retryAfterMs] is how long Spotify asked to wait, for a 429 that said.
+ */
 class CatalogException(
     message: String,
     val status: Int? = null,
     val reason: String? = null,
     cause: Throwable? = null,
+    val retryAfterMs: Long? = null,
 ) : Exception(message, cause) {
     val isAuth get() = status == 401
     val isForbidden get() = status == 403
     val isRateLimited get() = status == 429
+}
+
+/** "45 s", "3 min", "8 hr 31 min": a wait, rounded up, for messages like "Try again in …". */
+fun waitText(ms: Long): String {
+    val s = (ms.coerceAtLeast(0) + 999) / 1000
+    if (s < 60) return "$s s"
+    val min = (s + 59) / 60
+    return when {
+        min < 60 -> "$min min"
+        min % 60 == 0L -> "${min / 60} hr"
+        else -> "${min / 60} hr ${min % 60} min"
+    }
 }

@@ -1,5 +1,6 @@
 package app.remastered
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -11,18 +12,23 @@ import app.remastered.ui.wrapped.WrappedPreview
 import app.remastered.ui.theme.RemasteredTheme
 
 class MainActivity : ComponentActivity() {
-    private companion object {
-        const val EXTRA_LYRICS_PREVIEW = "lyrics_preview"
-        const val EXTRA_WRAPPED_PREVIEW = "wrapped_preview"
-        const val EXTRA_WRAPPED_FRAME = "wrapped_frame"
-        const val EXTRA_WRAPPED_DUMP = "wrapped_dump"
-        const val EXTRA_WRAPPED_EXPORT = "wrapped_export"
+    companion object {
+        /** From the media notification (media/NowPlayingService): open Now Playing. */
+        const val ACTION_OPEN_NOW_PLAYING = "app.remastered.OPEN_NOW_PLAYING"
+        private const val EXTRA_LYRICS_PREVIEW = "lyrics_preview"
+        private const val EXTRA_WRAPPED_PREVIEW = "wrapped_preview"
+        private const val EXTRA_WRAPPED_FRAME = "wrapped_frame"
+        private const val EXTRA_WRAPPED_DUMP = "wrapped_dump"
+        private const val EXTRA_WRAPPED_EXPORT = "wrapped_export"
     }
+
+    private val openNowPlaying = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
         val app = application as RemasteredApp
+        openNowPlaying.value = intent?.action == ACTION_OPEN_NOW_PLAYING
         // Debug builds only: `adb shell am start -n app.remastered/.MainActivity --es lyrics_preview spotify:track:…`
         // opens that track's lyrics on a local clock, for checking the lyrics view without Spotify.
         val lyricsPreview = mutableStateOf(intent.getStringExtra(EXTRA_LYRICS_PREVIEW)?.takeIf { BuildConfig.DEBUG && it.startsWith("spotify:track:") })
@@ -42,8 +48,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val container = app.container
             RemasteredTheme {
-                container?.let { RemasteredRoot(it, lyricsPreview, wrappedPreview) }
+                container?.let { RemasteredRoot(it, lyricsPreview, wrappedPreview, openNowPlaying) }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.action == ACTION_OPEN_NOW_PLAYING) openNowPlaying.value = true
     }
 }

@@ -50,7 +50,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
  *
  * Every call runs on [io]. A 401 triggers one [TokenProvider.refresh] and retry; a 429 is retried
  * up to [MAX_RATE_RETRIES] times honouring `Retry-After`, unless the wait exceeds
- * [MAX_RETRY_AFTER_S]. [sleep] is injectable so tests don't wait.
+ * [MAX_RETRY_AFTER_S]. A 429 that isn't retried goes into [limits], and that endpoint fails
+ * without a request until the wait is over. [sleep] is injectable so tests don't wait.
  */
 class WebCatalog(
     private val http: OkHttpClient,
@@ -58,6 +59,7 @@ class WebCatalog(
     baseUrl: String = "https://api.spotify.com/v1/",
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
+    private val limits: RateLimits = RateLimits(),
 ) : Catalog {
     private val base: HttpUrl = baseUrl.toHttpUrl()
 
@@ -277,6 +279,10 @@ class WebCatalog(
         withContext(io) { sendOnIo(url, method, body) }
 
     private suspend fun sendOnIo(url: HttpUrl, method: String, body: RequestBody?): String {
+        val endpoint = url.encodedPath
+        limits.remainingMs(endpoint)?.let {
+            throw CatalogException("Spotify 429: rate limited", 429, null, retryAfterMs = it)
+        }
         var token = token { tokens.accessToken() }
         var refreshed = false
         var rateRetries = 0
@@ -295,11 +301,14 @@ class WebCatalog(
                     refreshed = true
                     token = token { tokens.refresh() }
                 }
-                reply.code == 429 && rateRetries < MAX_RATE_RETRIES -> {
-                    val waitS = reply.retryAfter?.trim()?.toLongOrNull() ?: 1L
-                    if (waitS > MAX_RETRY_AFTER_S) throw error(reply)
+                reply.code == 429 && rateRetries < MAX_RATE_RETRIES && retryAfterS(reply).let { it == null || it <= MAX_RETRY_AFTER_S } -> {
                     rateRetries++
-                    sleep(waitS * 1000)
+                    sleep((retryAfterS(reply) ?: 1L) * 1000)
+                }
+                reply.code == 429 -> {
+                    val waitS = retryAfterS(reply)
+                    if (waitS != null) limits.limit(endpoint, waitS * 1000)
+                    throw error(reply, waitS?.times(1000))
                 }
                 else -> throw error(reply)
             }
@@ -307,6 +316,8 @@ class WebCatalog(
     }
 
     private class Reply(val code: Int, val retryAfter: String?, val body: String)
+
+    private fun retryAfterS(reply: Reply) = reply.retryAfter?.trim()?.toLongOrNull()?.takeIf { it >= 0 }
 
     private suspend fun token(fetch: suspend () -> String): String = try {
         fetch()
@@ -321,7 +332,7 @@ class WebCatalog(
     }
 
     /** Parses Spotify's `{"error":{"status","message","reason"}}`; tolerates anything else. */
-    private fun error(reply: Reply): CatalogException {
+    private fun error(reply: Reply, retryAfterMs: Long? = null): CatalogException {
         var message: String? = null
         var reason: String? = null
         try {
@@ -336,7 +347,7 @@ class WebCatalog(
         } catch (_: Exception) {
             // Not JSON (e.g. a plain-text 429 or a proxy page).
         }
-        return CatalogException("Spotify ${reply.code}: ${message ?: "request failed"}", reply.code, reason)
+        return CatalogException("Spotify ${reply.code}: ${message ?: "request failed"}", reply.code, reason, retryAfterMs = retryAfterMs)
     }
 
     private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull

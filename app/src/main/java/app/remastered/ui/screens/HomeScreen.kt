@@ -78,8 +78,9 @@ private suspend fun loadHome(app: AppState): HomeData = coroutineScope {
     val recent = async { c.recentlyPlayed(50) }
     val artists = async { runCatching { c.topArtists(TimeRange.Short, 12) }.getOrDefault(emptyList()) }
     val tracks = async { runCatching { c.topTracks(TimeRange.Short, 8) }.getOrDefault(emptyList()) }
-    val contexts = recent.await().mapNotNull { it.context }.distinctBy { it.uri }.take(14)
-    val resolved = contexts.map { ctx ->
+    val plays = recent.await()
+    val contexts = plays.mapNotNull { it.context }.distinctBy { it.uri }.take(14)
+    val byUri = contexts.map { ctx ->
         async {
             val id = ctx.uri.substringAfterLast(':')
             runCatching {
@@ -91,7 +92,13 @@ private suspend fun loadHome(app: AppState): HomeData = coroutineScope {
                 }
             }.getOrNull()
         }
-    }.awaitAll().filterNotNull()
+    }.awaitAll().filterNotNull().associateBy { it.uri }
+    // Plays without a context, or whose context the API won't return (Spotify-owned
+    // playlists in Development Mode), fall back to the track's album so the grid stays full.
+    val resolved = plays.mapNotNull { h ->
+        h.context?.uri?.let(byUri::get)
+            ?: h.track.album?.let { a -> HomeItem(a.uri, a.name, "Album  ·  ${h.track.artistNames}", a.images.best()?.url, false) }
+    }.distinctBy { it.uri }
     val liked = HomeItem("liked", "Liked Songs", "", null, false)
     HomeData(
         shortcuts = (listOf(liked) + resolved).take(8),
@@ -109,7 +116,7 @@ private fun greeting(): String = when (LocalTime.now().hour) {
 
 @Composable
 fun HomeScreen(app: AppState) {
-    val home = load(Unit) { loadHome(app) }
+    val home = load(app.c.screens, "home") { loadHome(app) }
     val connection by app.c.player.connection.collectAsState()
     val liked by app.c.liked.uris.collectAsState()
     val history = rememberHomeHistory(app)
