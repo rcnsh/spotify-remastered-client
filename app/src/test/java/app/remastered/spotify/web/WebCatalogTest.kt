@@ -221,6 +221,7 @@ class WebCatalogTest {
         assertEquals("a1", t.album!!.id)
         assertEquals("Discovery", t.album.name)
         assertEquals("https://i/a1", t.album.images.single().url)
+        assertEquals(1, t.discNumber)
         assertTrue(detail.tracks.hasMore)
 
         // Next page reuses the remembered album: no extra /albums/{id} request.
@@ -420,7 +421,7 @@ class WebCatalogTest {
             "album":{"id":"a1","name":"Discovery","album_type":"album","images":[{"url":"https://i/a1","height":640,"width":640}],
             "release_date":"2001-03-12","total_tracks":14,"artists":[{"id":"ar1","name":"Daft Punk"}]}}"""
 
-        const val SIMPLE_TRACK = """{"id":"t1","name":"One More Time","type":"track","duration_ms":320357,"track_number":1,
+        const val SIMPLE_TRACK = """{"id":"t1","name":"One More Time","type":"track","duration_ms":320357,"track_number":1,"disc_number":1,
             "artists":[{"id":"ar1","name":"Daft Punk"}]}"""
 
         const val EPISODE = """{"id":"e1","name":"Ep 1","type":"episode","duration_ms":1000,"explicit":false,

@@ -64,6 +64,7 @@ internal fun TrackDto.toModel(fallbackAlbum: AlbumRef? = null): Track? {
             durationMs = durationMs,
             explicit = explicit,
             trackNumber = trackNumber,
+            discNumber = discNumber,
             isPlayable = isPlayable,
         )
         "episode" -> Track(

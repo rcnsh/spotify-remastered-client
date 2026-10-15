@@ -51,6 +51,7 @@ internal data class TrackDto(
     @SerialName("duration_ms") val durationMs: Long = 0,
     val explicit: Boolean = false,
     @SerialName("track_number") val trackNumber: Int? = null,
+    @SerialName("disc_number") val discNumber: Int? = null,
     @SerialName("is_playable") val isPlayable: Boolean = true,
     @SerialName("is_local") val isLocal: Boolean = false,
     // Episode-only.

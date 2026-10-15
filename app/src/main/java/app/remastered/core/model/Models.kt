@@ -33,6 +33,7 @@ data class Track(
     val durationMs: Long,
     val explicit: Boolean = false,
     val trackNumber: Int? = null,
+    val discNumber: Int? = null,
     val isPlayable: Boolean = true,
     val isEpisode: Boolean = false,
 ) {
