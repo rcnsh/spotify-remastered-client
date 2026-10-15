@@ -71,5 +71,7 @@ object Icons {
     val Remove = icon("minus", listOf(circle(12f, 12f, 9.5f), "M8 12h8"))
     val Check = icon("check", listOf("m5 12.5 4.5 4.5L19 7"))
     val Folder = icon("folder", listOf("M3 7.5V18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7l-2-2.5H5a2 2 0 0 0-2 2z"))
+    val Podcast = icon("podcast", listOf(rect(9f, 2.5f, 6f, 11.5f, 3f), "M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21.5M8.5 21.5h7"))
+    val Image = icon("image", listOf(rect(3f, 3.5f, 18f, 17f, 2.5f), circle(8.5f, 9f, 1.8f), "m21 15.5-4.8-4.8a1.2 1.2 0 0 0-1.7 0L4.5 20.5"))
     val Settings = icon("sliders", listOf("M20 7h-9M14 17H5", circle(17f, 17f, 3f), circle(7f, 7f, 3f)))
 }

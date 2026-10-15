@@ -85,13 +85,31 @@ data class Playlist(
 fun Playlist.canReadItems(me: UserRef?) = collaborative || owner.id == me?.id
 fun Playlist.canEdit(me: UserRef?) = canReadItems(me)
 
-data class PlaylistItem(val track: Track, val addedAtEpochMs: Long?)
+/**
+ * [position] is the item's index in the playlist as Spotify counts it (local files included), which
+ * playback and reordering need; -1 when unknown.
+ */
+data class PlaylistItem(val track: Track, val addedAtEpochMs: Long?, val position: Int = -1)
 
 data class Page<T>(val items: List<T>, val offset: Int, val total: Int?, val hasMore: Boolean) {
     companion object {
         fun <T> of(items: List<T>) = Page(items, 0, items.size, false)
     }
 }
+
+/** A podcast. Spotify no longer sends the publisher (Feb 2026). */
+data class Show(
+    val id: String,
+    val name: String,
+    val description: String,
+    val images: List<Image>,
+    val totalEpisodes: Int,
+) {
+    val uri get() = "spotify:show:$id"
+}
+
+/** An episode of a show: [track] (with [Track.isEpisode]) is what plays and what menus take. */
+data class Episode(val track: Track, val description: String, val releaseDate: String)
 
 data class ContextRef(val uri: String, val type: String)
 

@@ -14,6 +14,8 @@ sealed interface Route {
     data class Playlist(val id: String) : Route
     data class Album(val id: String) : Route
     data class Artist(val id: String) : Route
+    /** A podcast and its episodes. */
+    data class Show(val id: String) : Route
     data object Settings : Route
 
     // Listening history, from the user's music-warehouse. Entry points show only while
@@ -43,6 +45,7 @@ sealed interface Route {
                 "playlist" -> Playlist(parts[2])
                 "album" -> Album(parts[2])
                 "artist" -> Artist(parts[2])
+                "show" -> Show(parts[2])
                 "collection" -> LikedSongs
                 "user" -> if (parts.getOrNull(3) == "collection") LikedSongs else if (parts.getOrNull(3) == "playlist") parts.getOrNull(4)?.let(::Playlist) else null
                 else -> null

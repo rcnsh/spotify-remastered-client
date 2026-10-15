@@ -8,6 +8,7 @@ import app.remastered.core.model.AlbumGroup
 import app.remastered.core.model.AlbumRef
 import app.remastered.core.model.Artist
 import app.remastered.core.model.Device
+import app.remastered.core.model.Episode
 import app.remastered.core.model.Page
 import app.remastered.core.model.PlayHistory
 import app.remastered.core.model.Playlist
@@ -15,11 +16,13 @@ import app.remastered.core.model.PlaylistItem
 import app.remastered.core.model.Queue
 import app.remastered.core.model.SearchResults
 import app.remastered.core.model.SearchType
+import app.remastered.core.model.Show
 import app.remastered.core.model.TimeRange
 import app.remastered.core.model.Track
 import app.remastered.core.model.UserRef
 import java.io.IOException
 import java.net.URLEncoder
+import java.util.Base64
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +66,8 @@ class WebCatalog(
 ) : Catalog {
     private val base: HttpUrl = baseUrl.toHttpUrl()
 
-    // Album tracks come without their album; remember albums we've seen to fill AlbumRef.
+    // Album tracks and show episodes come without their album or show; remember the ones we've
+    // seen to fill AlbumRef.
     private val albumRefs = object : LinkedHashMap<String, AlbumRef>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AlbumRef>?) = size > 200
     }
@@ -109,14 +113,21 @@ class WebCatalog(
     override suspend fun likedTracks(offset: Int, limit: Int): Page<Track> =
         get<PagingDto<SavedTrackDto>>(url("me/tracks") { page(offset, limit, 50) }).toPage { it.track?.toModel() }
 
+    override suspend fun savedShows(offset: Int, limit: Int): Page<Show> =
+        get<PagingDto<SavedShowDto>>(url("me/shows") { page(offset, limit, 50) }).toPage { it.show?.toModel() }
+
     override suspend fun playlist(id: String): Playlist =
         get<PlaylistDto>(url("playlists", id)).toModel() ?: throw malformed("playlist")
 
-    override suspend fun playlistItems(id: String, offset: Int, limit: Int): Page<PlaylistItem> =
-        get<PagingDto<PlaylistEntryDto>>(url("playlists", id, "items") {
+    override suspend fun playlistItems(id: String, offset: Int, limit: Int): Page<PlaylistItem> {
+        val dto = get<PagingDto<PlaylistEntryDto>>(url("playlists", id, "items") {
             page(offset, limit, 50)
             add("additional_types", "track,episode")
-        }).toPage { it.toModel() }
+        })
+        // Count every entry, local files included, so positions match Spotify's.
+        val items = dto.items.mapIndexedNotNull { i, entry -> entry?.toModel(dto.offset + i) }
+        return Page(items, dto.offset, dto.total, dto.next != null)
+    }
 
     override suspend fun album(id: String): AlbumDetail {
         val dto = get<AlbumDto>(url("albums", id))
@@ -141,6 +152,15 @@ class WebCatalog(
             if (groups.isNotEmpty()) addEncoded("include_groups", groups.joinToString(",") { it.api })
             page(offset, limit, 10)
         }).toPage { it.toModel() }
+
+    override suspend fun show(id: String): Show =
+        (get<ShowDto>(url("shows", id)).toModel() ?: throw malformed("show")).also { remember(AlbumRef(it.id, it.name, it.images)) }
+
+    // Episodes come without their show, which stands in for the album; as with album tracks.
+    override suspend fun showEpisodes(id: String, offset: Int, limit: Int): Page<Episode> {
+        val show = synchronized(albumRefs) { albumRefs[id] } ?: show(id).let { AlbumRef(it.id, it.name, it.images) }
+        return get<PagingDto<TrackDto>>(url("shows", id, "episodes") { page(offset, limit, 50) }).toPage { it.toEpisode(show) }
+    }
 
     override suspend fun search(query: String, types: Set<SearchType>, offset: Int, limit: Int): SearchResults {
         if (query.isBlank() || types.isEmpty()) return SearchResults()
@@ -234,6 +254,21 @@ class WebCatalog(
             put("range_length", 1)
             snapshotId?.let { put("snapshot_id", it) }
         })).snapshotId
+
+    override suspend fun updatePlaylistDetails(playlistId: String, name: String, description: String) {
+        send(url("playlists", playlistId), "PUT", jsonBody {
+            put("name", name)
+            put("description", description)
+        })
+    }
+
+    // The body is the JPEG as base64 text, sent as image/jpeg (reference: upload-custom-playlist-cover).
+    override suspend fun uploadPlaylistCover(playlistId: String, jpeg: ByteArray) {
+        val body = Base64.getEncoder().encodeToString(jpeg)
+        if (body.length > Catalog.MAX_COVER_BASE64) throw CatalogException("Cover image is too large", null, "COVER_TOO_LARGE")
+        // As bytes: a String body would add "; charset=utf-8" to the content type.
+        send(url("playlists", playlistId, "images"), "PUT", body.toByteArray(Charsets.US_ASCII).toRequestBody(JPEG_TYPE))
+    }
 
     // --- plumbing ---
 
@@ -359,6 +394,7 @@ class WebCatalog(
         const val LIBRARY_CHUNK = 40
         const val PLAYLIST_CHUNK = 100
         private val JSON_TYPE = "application/json".toMediaType()
+        private val JPEG_TYPE = "image/jpeg".toMediaType()
         private val EMPTY_BODY = ByteArray(0).toRequestBody(null)
         val json = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
     }

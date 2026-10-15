@@ -37,8 +37,18 @@ internal data class AlbumDto(
     val tracks: PagingDto<TrackDto>? = null,
 )
 
+/** A show; `publisher` went in Feb 2026. `description` is plain text (`html_description` isn't). */
 @Serializable
-internal data class ShowDto(val id: String? = null, val name: String = "", val images: List<ImageDto?> = emptyList())
+internal data class ShowDto(
+    val id: String? = null,
+    val name: String = "",
+    val description: String? = null,
+    val images: List<ImageDto?> = emptyList(),
+    @SerialName("total_episodes") val totalEpisodes: Int = 0,
+)
+
+@Serializable
+internal data class SavedShowDto(@SerialName("added_at") val addedAt: String? = null, val show: ShowDto? = null)
 
 /** A track or, with `type == "episode"`, an episode: both share this shape closely enough. */
 @Serializable
@@ -57,6 +67,8 @@ internal data class TrackDto(
     // Episode-only.
     val images: List<ImageDto?> = emptyList(),
     val show: ShowDto? = null,
+    val description: String? = null,
+    @SerialName("release_date") val releaseDate: String? = null,
 )
 
 @Serializable

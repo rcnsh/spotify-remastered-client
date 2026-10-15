@@ -19,6 +19,14 @@ class ScreenCache(private val clock: () -> Long, private val capacity: Int = 40)
         entries[key] = Entry(value, clock(), version)
     }
 
+    /**
+     * Replaces the value under [key] after the screen changed it locally (a playlist reordered),
+     * keeping when it was loaded and its keys; does nothing if it's no longer cached.
+     */
+    @Synchronized fun update(key: String, value: Any?) {
+        entries[key]?.let { entries[key] = Entry(value, it.loadedAt, it.version) }
+    }
+
     /** Whether [entry] can be shown without refreshing: loaded with the same [version], less than [maxAgeMs] ago. */
     fun isFresh(entry: Entry, version: List<Any?>, maxAgeMs: Long) =
         entry.version == version && clock() - entry.loadedAt < maxAgeMs

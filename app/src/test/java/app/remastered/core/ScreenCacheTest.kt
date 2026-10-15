@@ -25,6 +25,18 @@ class ScreenCacheTest {
         assertEquals("data", e.value) // still shown while it reloads
     }
 
+    @Test fun updateKeepsLoadTimeAndKeys() {
+        cache.put("playlist:1", "old order", listOf(0))
+        now = 30_000
+        cache.update("playlist:1", "new order")
+        cache.update("playlist:2", "never loaded")
+        val e = cache.get("playlist:1")!!
+        assertEquals("new order", e.value)
+        assertEquals(0L, e.loadedAt)
+        assertEquals(listOf(0), e.version)
+        assertNull(cache.get("playlist:2"))
+    }
+
     @Test fun dropsLeastRecentlyUsed() {
         cache.put("a", 1, emptyList())
         cache.put("b", 2, emptyList())

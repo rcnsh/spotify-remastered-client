@@ -8,11 +8,13 @@ import app.remastered.core.model.ArtistRef
 import app.remastered.core.model.ContextRef
 import app.remastered.core.model.Device
 import app.remastered.core.model.DeviceType
+import app.remastered.core.model.Episode
 import app.remastered.core.model.Image
 import app.remastered.core.model.Page
 import app.remastered.core.model.PlayHistory
 import app.remastered.core.model.Playlist
 import app.remastered.core.model.PlaylistItem
+import app.remastered.core.model.Show
 import app.remastered.core.model.Track
 import app.remastered.core.model.UserRef
 import java.time.Instant
@@ -71,7 +73,7 @@ internal fun TrackDto.toModel(fallbackAlbum: AlbumRef? = null): Track? {
             id = id,
             name = name,
             artists = emptyList(),
-            album = show?.id?.let { AlbumRef(it, show.name, show.images.toImages().ifEmpty { images.toImages() }) },
+            album = show?.id?.let { AlbumRef(it, show.name, show.images.toImages().ifEmpty { images.toImages() }) } ?: fallbackAlbum,
             durationMs = durationMs,
             explicit = explicit,
             isPlayable = isPlayable,
@@ -81,11 +83,20 @@ internal fun TrackDto.toModel(fallbackAlbum: AlbumRef? = null): Track? {
     }
 }
 
+/** An episode of [show] (`/shows/{id}/episodes` leaves the show out of each episode). */
+internal fun TrackDto.toEpisode(show: AlbumRef?): Episode? {
+    if (type != "episode") return null
+    val track = toModel(show) ?: return null
+    return Episode(track, description.orEmpty(), releaseDate.orEmpty())
+}
+
+internal fun ShowDto.toModel(): Show? = id?.let { Show(it, name, description.orEmpty().trim(), images.toImages(), totalEpisodes) }
+
 internal fun PlaylistDto.toModel(): Playlist? = id?.let {
     Playlist(
         id = it,
         name = name,
-        description = description.orEmpty(),
+        description = description.orEmpty().htmlText(),
         images = images.toImages(),
         owner = owner?.toModel() ?: UserRef("", ""),
         trackCount = (items ?: tracks)?.total ?: 0,
@@ -94,10 +105,28 @@ internal fun PlaylistDto.toModel(): Playlist? = id?.let {
     )
 }
 
-internal fun PlaylistEntryDto.toModel(): PlaylistItem? {
+internal fun PlaylistEntryDto.toModel(position: Int = -1): PlaylistItem? {
     if (isLocal) return null
     val track = content?.toModel() ?: return null
-    return PlaylistItem(track, addedAt.toEpochMs())
+    return PlaylistItem(track, addedAt.toEpochMs(), position)
+}
+
+private val entity = Regex("&(#[0-9]+|#[xX][0-9a-fA-F]+|amp|lt|gt|quot|apos);")
+
+/**
+ * Playlist descriptions come HTML-escaped (`It&#x27;s`). Decodes the entities Spotify uses so the
+ * text shows, and edits round-trip, as the user typed it.
+ */
+internal fun String.htmlText(): String = entity.replace(this) { m ->
+    when (val e = m.groupValues[1]) {
+        "amp" -> "&"
+        "lt" -> "<"
+        "gt" -> ">"
+        "quot" -> "\""
+        "apos" -> "'"
+        else -> (if (e[1] == 'x' || e[1] == 'X') e.drop(2).toIntOrNull(16) else e.drop(1).toIntOrNull())
+            ?.takeIf { Character.isValidCodePoint(it) }?.let { String(Character.toChars(it)) } ?: m.value
+    }
 }
 
 internal fun PlayHistoryDto.toModel(): PlayHistory? {
