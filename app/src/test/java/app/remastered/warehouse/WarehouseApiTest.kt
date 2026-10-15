@@ -194,6 +194,29 @@ class WarehouseApiTest {
         assertNull(day.years[0].topTracks[1].imageUrl)
     }
 
+    @Test fun `home rows`() = runTest {
+        enqueue("""{"tz":"Asia/Singapore","hour":20,
+            "shortcuts":[{"uri":"spotify:album:$TRACK_ID","type":"album","name":"Album One","image":"https://i/1","artist":"Ada","sessions":14,"last_played_ms":1760554020000},
+                         {"uri":"spotify:playlist:$TRACK_ID","type":"playlist","name":null,"image":null,"artist":null,"sessions":3},
+                         {"uri":"spotify:user:me:collection","name":"Liked"},
+                         {"uri":"spotify:album:$TRACK_ID","name":"Again"},
+                         null],
+            "jump_back_in":[{"uri":"spotify:artist:$TRACK_ID","name":"  "}],
+            "rediscover":[]}""")
+        val feed = api.home(SGT)
+        val req = take()
+        assertEquals("/api/home", req.path)
+        assertEquals("Asia/Singapore", req.query("tz"))
+        assertEquals(20, feed.hour)
+        // Only playlists, albums and artists, each once; the type comes from the uri.
+        assertEquals(listOf("album", "playlist"), feed.shortcuts.map { it.type })
+        assertEquals("Ada", feed.shortcuts[0].artist)
+        assertEquals(1760554020000, feed.shortcuts[0].lastPlayedMs)
+        assertNull(feed.shortcuts[1].name)
+        assertNull(feed.jumpBackIn.single().name)
+        assertEquals(emptyList<Any>(), feed.aroundNow)
+    }
+
     @Test fun `on repeat`() = runTest {
         enqueue("""{"as_of":"2026-10-10T16:00:00.000Z","window_days":14,
             "tracks":[{"track_id":"$TRACK_ID","name":"Song One","artists":"Ada","album":"Album One","image":"https://i/1",
@@ -456,12 +479,15 @@ class WarehouseApiTest {
         enqueue("""{"error":"id is required"}""", 400)
         enqueue("""{"error":"Not found"}""", 404)
         enqueue("""{"error":"date must be a real YYYY-MM-DD date"}""", 400)
+        enqueue("""{"error":"Unknown IANA timezone: -"}""", 400)
         assertEquals(true, api.serves(WarehouseFeature.TrackHistory))
         assertEquals("/api/track", take().path)
         assertEquals(false, api.serves(WarehouseFeature.ArtistHistory))
         take()
         assertEquals(true, api.serves(WarehouseFeature.OnThisDay))
         assertEquals("-", take().query("date"))
+        assertEquals(true, api.serves(WarehouseFeature.Home))
+        assertEquals("-", take().query("tz"))
         server.close()
         assertNull(api.serves(WarehouseFeature.WrappedRanges))
     }

@@ -23,12 +23,15 @@ polls their play history into D1 every 30 minutes and serves it over a small API
   year, and the year so far up to the last complete week) that READ_TOKEN may compute, and
   the daily cron warms them. Arbitrary ranges stay ADMIN_TOKEN only.
 - **New warehouse routes** for the client: `/api/wrapped/ranges`, `/api/artist`,
-  `/api/track`, `/api/on-this-day`.
+  `/api/track`, `/api/on-this-day`, and later `/api/home` (Home's rows, ranked from the
+  history, since Spotify's own home isn't open to apps).
 - **Features**, each hidden while the warehouse isn't configured:
   - full History, merged with `recently-played` for the plays newer than the last poll;
   - Home's "On repeat" from `/api/stats/on-repeat`, falling back to the Web API;
   - a Stats screen (daily plays, top artists by range, rhythm, top over time, eras, albums);
   - "Your plays" on artist and track pages, and "On this day" on Home;
+  - Home's shortcuts, "Jump back in", "Around this time" and "Rediscover" from
+    `/api/home`, falling back to `recently-played`;
   - **Wrapped as native Compose**, not a WebView. Every slide is a pure function of the
     frame number, as in Remotion, so the story can be scrubbed and exported to MP4 with
     `MediaCodec`. The three.js scenes become 2.5D Canvas/AGSL. While viewing, each slide's

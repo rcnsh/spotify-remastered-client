@@ -20,6 +20,8 @@ import app.remastered.core.warehouse.ListeningAge
 import app.remastered.core.warehouse.MonthPlays
 import app.remastered.core.warehouse.MonthRange
 import app.remastered.core.warehouse.OnRepeat
+import app.remastered.core.warehouse.HomeEntry
+import app.remastered.core.warehouse.HomeFeed
 import app.remastered.core.warehouse.OnThisDay
 import app.remastered.core.warehouse.OnThisDayTrack
 import app.remastered.core.warehouse.OnThisDayYear
@@ -103,6 +105,17 @@ internal fun OnThisDayDto.toModel(asked: LocalDate) = OnThisDay(
         OnThisDayYear(year, y.plays, y.topTracks.mapNotNull { t -> t?.name?.let { OnThisDayTrack(t.id, it, t.artist, t.image, t.plays) } })
     },
 )
+
+internal fun HomeDto.toModel() = HomeFeed(hour, shortcuts.entries(), jumpBackIn.entries(), aroundNow.entries(), rediscover.entries())
+
+/** Entries Home can open: a playlist, album or artist uri (the type is read from it). */
+private fun List<HomeEntryDto?>.entries() = mapNotNull { e ->
+    val uri = e?.uri ?: return@mapNotNull null
+    val type = HOME_URI.matchEntire(uri)?.groupValues?.get(1) ?: return@mapNotNull null
+    HomeEntry(uri, type, e.name?.takeIf { it.isNotBlank() }, e.image, e.artist, e.sessions, e.lastPlayedMs)
+}.distinctBy { it.uri }
+
+private val HOME_URI = Regex("spotify:(playlist|album|artist):[0-9A-Za-z]+")
 
 internal fun OnRepeatDto.toModel() = OnRepeat(
     asOf = instant(asOf),

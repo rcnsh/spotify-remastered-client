@@ -96,6 +96,36 @@ data class OnThisDayYear(val year: Int, val plays: Int, val topTracks: List<OnTh
 
 data class OnThisDay(val date: LocalDate, val years: List<OnThisDayYear>)
 
+// --- /api/home ---
+
+/**
+ * A playlist, album or artist the warehouse ranked for Home. [name] and [imageUrl] are null when
+ * it doesn't know them (playlists and artists have no image there): look those up. [artist] is an
+ * album's or artist page's primary artist. [sessions] is how often it was played from (for
+ * Rediscover, on how many days).
+ */
+data class HomeEntry(
+    val uri: String,
+    val type: String,
+    val name: String?,
+    val imageUrl: String?,
+    val artist: String?,
+    val sessions: Int,
+    val lastPlayedMs: Long?,
+)
+
+/**
+ * Home's rows from the history. Rows can overlap: show each entry once, in this order.
+ * [hour] is the local hour the rows were ranked for.
+ */
+data class HomeFeed(
+    val hour: Int?,
+    val shortcuts: List<HomeEntry>,
+    val jumpBackIn: List<HomeEntry>,
+    val aroundNow: List<HomeEntry>,
+    val rediscover: List<HomeEntry>,
+)
+
 // --- /api/stats/on-repeat ---
 
 data class RepeatTrack(

@@ -3,6 +3,7 @@ package app.remastered.warehouse
 import app.remastered.core.warehouse.ArtistHistory
 import app.remastered.core.warehouse.DailyPlays
 import app.remastered.core.warehouse.Eras
+import app.remastered.core.warehouse.HomeFeed
 import app.remastered.core.warehouse.OnRepeat
 import app.remastered.core.warehouse.OnThisDay
 import app.remastered.core.warehouse.Play
@@ -81,6 +82,8 @@ class WarehouseApi(
     override suspend fun onThisDay(date: LocalDate, zone: ZoneId): OnThisDay =
         get<OnThisDayDto>("api/on-this-day") { add("date", date.toString()); add("tz", zone.id) }.toModel(date)
 
+    override suspend fun home(zone: ZoneId): HomeFeed = get<HomeDto>("api/home") { add("tz", zone.id) }.toModel()
+
     override suspend fun onRepeat(): OnRepeat = get<OnRepeatDto>("api/stats/on-repeat").toModel()
     override suspend fun rhythm(): Rhythm = get<RhythmDto>("api/stats/rhythm").toModel()
     override suspend fun topOverTime(): TopOverTime = get<TopOverTimeDto>("api/stats/top-over-time").toModel()
@@ -103,6 +106,7 @@ class WarehouseApi(
             send(feature.path) {
                 when (feature) {
                     WarehouseFeature.OnThisDay -> add("date", "-")
+                    WarehouseFeature.Home -> add("tz", "-")
                     WarehouseFeature.ArtistHistory, WarehouseFeature.TrackHistory, WarehouseFeature.WrappedRanges -> Unit
                 }
             }

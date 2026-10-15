@@ -26,6 +26,8 @@ interface Warehouse {
     suspend fun track(id: String, zone: ZoneId = ZoneId.systemDefault()): TrackHistory
     /** The same calendar day in earlier years, newest year first. */
     suspend fun onThisDay(date: LocalDate = LocalDate.now(), zone: ZoneId = ZoneId.systemDefault()): OnThisDay
+    /** Home's rows, ranked from the whole history for this local hour. */
+    suspend fun home(zone: ZoneId = ZoneId.systemDefault()): HomeFeed
 
     // Stats (cached by the warehouse; a cold one may take a few seconds)
     suspend fun onRepeat(): OnRepeat
@@ -45,7 +47,7 @@ interface Warehouse {
 }
 
 /**
- * Routes added to the warehouse after the first read API (warehouse PR #5). An older deployment
+ * Routes added to the warehouse after the first read API (warehouse PR #5; Home later). An older deployment
  * answers 404 for them; [app.remastered.warehouse.WarehouseServices.missing] says which, so the
  * features built on them hide instead of failing.
  */
@@ -54,6 +56,7 @@ enum class WarehouseFeature(internal val path: String) {
     TrackHistory("api/track"),
     OnThisDay("api/on-this-day"),
     WrappedRanges("api/wrapped/ranges"),
+    Home("api/home"),
 }
 
 /** A warehouse failure the UI can show. [status] is the HTTP status, or null when there wasn't one. */

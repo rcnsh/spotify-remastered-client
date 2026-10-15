@@ -107,6 +107,28 @@ internal data class OnThisDayTrackDto(
     val plays: Int = 0,
 )
 
+// --- /api/home ---
+
+@Serializable
+internal data class HomeDto(
+    val hour: Int? = null,
+    val shortcuts: List<HomeEntryDto?> = emptyList(),
+    @SerialName("jump_back_in") val jumpBackIn: List<HomeEntryDto?> = emptyList(),
+    @SerialName("around_now") val aroundNow: List<HomeEntryDto?> = emptyList(),
+    val rediscover: List<HomeEntryDto?> = emptyList(),
+)
+
+@Serializable
+internal data class HomeEntryDto(
+    val uri: String? = null,
+    val type: String? = null,
+    val name: String? = null,
+    val image: String? = null,
+    val artist: String? = null,
+    val sessions: Int = 0,
+    @SerialName("last_played_ms") val lastPlayedMs: Long? = null,
+)
+
 // --- /api/stats/on-repeat ---
 
 @Serializable
