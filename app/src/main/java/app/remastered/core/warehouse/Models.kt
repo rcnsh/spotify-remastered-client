@@ -42,6 +42,13 @@ data class Play(
     val playedAt: Instant get() = Instant.ofEpochMilli(playedAtMs)
 }
 
+/**
+ * One page of plays, newest first. [nextBefore] is the warehouse's opaque cursor for the page
+ * after it (pass it back as `before`), null once there's nothing older. [cursored] is false for a
+ * warehouse too old to send a cursor at all; page those by time instead (see [PlayPager]).
+ */
+data class PlayPage(val plays: List<Play>, val nextBefore: String?, val cursored: Boolean)
+
 data class DayPlays(val day: LocalDate, val plays: Int)
 
 data class DailyPlays(val from: LocalDate, val to: LocalDate, val timeZone: String, val days: List<DayPlays>)

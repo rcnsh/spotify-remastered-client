@@ -93,7 +93,7 @@ fun HistoryScreen(app: AppState, day: LocalDate? = null) {
 
     /** Starts over from [from]. With [keep], a failure leaves the current list (pull to refresh). */
     suspend fun reload(from: LocalDate?, keep: Boolean) = coroutineScope {
-        val p = PlayPager(from?.let { endOfDayMs(it, zone) }, PAGE) { before, limit -> api.plays(limit, before) }
+        val p = PlayPager(from?.let { endOfDayMs(it, zone) }, PAGE) { before, limit -> api.playsPage(limit, before) }
         val latest = if (from == null) async { runCatching { app.c.catalog.recentlyPlayed(50).map { it.toPlay() } }.getOrDefault(emptyList()) } else null
         try {
             p.loadMore()

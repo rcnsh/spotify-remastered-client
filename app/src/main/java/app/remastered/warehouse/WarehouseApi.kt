@@ -7,6 +7,7 @@ import app.remastered.core.warehouse.HomeFeed
 import app.remastered.core.warehouse.OnRepeat
 import app.remastered.core.warehouse.OnThisDay
 import app.remastered.core.warehouse.Play
+import app.remastered.core.warehouse.PlayPage
 import app.remastered.core.warehouse.Rhythm
 import app.remastered.core.warehouse.TopAlbums
 import app.remastered.core.warehouse.TopArtists
@@ -59,6 +60,15 @@ class WarehouseApi(
             beforeMs?.let { add("before", it) }
             afterMs?.let { add("after", it) }
         }.plays.mapNotNull { it?.toModel() }
+
+    override suspend fun playsPage(limit: Int, before: String?): PlayPage =
+        get<PlaysDto>("api/plays") {
+            add("limit", limit.coerceIn(1, 500))
+            before?.let { add("before", it) }
+        }.let { dto ->
+            val cursored = dto.nextBefore != NO_CURSOR
+            PlayPage(dto.plays.mapNotNull { it?.toModel() }, dto.nextBefore.takeIf { cursored }, cursored)
+        }
 
     override suspend fun daily(from: LocalDate, to: LocalDate, zone: ZoneId): DailyPlays =
         get<DailyDto>("api/daily") { range(from, to); add("tz", zone.id) }.toModel(from, to, zone.id)

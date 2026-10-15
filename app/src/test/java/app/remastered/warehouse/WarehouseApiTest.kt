@@ -90,6 +90,29 @@ class WarehouseApiTest {
         assertEquals(listOf("api/plays" to null), outcomes)
     }
 
+    @Test fun `plays page passes the cursor back and reads the next one`() = runTest {
+        enqueue("""{"plays":[{"played_at_ms":1791888986386,"track_id":"$TRACK_ID","track_name":"Song One"}],
+            "next_before":"1791888986386.$TRACK_ID"}""")
+        enqueue("""{"plays":[],"next_before":null}""")
+        enqueue("""{"plays":[]}""")
+        val first = api.playsPage(limit = 1, before = "1791888990000.zzz")
+        assertEquals("1791888990000.zzz", take().query("before"))
+        assertEquals("1791888986386.$TRACK_ID", first.nextBefore)
+        assertTrue(first.cursored)
+        assertEquals(1, first.plays.size)
+
+        val last = api.playsPage(limit = 1, before = first.nextBefore)
+        assertEquals("1791888986386.$TRACK_ID", take().query("before"))
+        assertNull(last.nextBefore)
+        assertTrue(last.cursored)
+
+        // A warehouse from before the cursor sends no next_before at all.
+        val old = api.playsPage(limit = 1)
+        assertNull(take().query("before"))
+        assertNull(old.nextBefore)
+        assertFalse(old.cursored)
+    }
+
     @Test fun `plays clamps limit`() = runTest {
         enqueue("""{"plays":[]}""")
         api.plays(limit = 10_000)

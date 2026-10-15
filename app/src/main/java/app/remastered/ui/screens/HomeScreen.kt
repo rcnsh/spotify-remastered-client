@@ -195,7 +195,7 @@ private suspend fun fromRecent(app: AppState, plays: List<PlayHistory>): HomeRow
     val c = app.c.catalog
     val older = async {
         if (!app.c.warehouse.state.value.isUsable) emptyList()
-        else runCatching { recentContexts(HOME_CONTEXTS) { before, limit -> app.c.warehouse.api.plays(limit, beforeMs = before) } }
+        else runCatching { recentContexts(HOME_CONTEXTS) { before, limit -> app.c.warehouse.api.playsPage(limit, before) } }
             .getOrDefault(emptyList())
     }
     val recentItems = async { fromPlays(c, plays, HOME_CONTEXTS) }

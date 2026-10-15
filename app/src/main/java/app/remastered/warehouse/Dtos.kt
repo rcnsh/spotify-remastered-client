@@ -13,8 +13,17 @@ internal data class ErrorDto(val error: String? = null)
 
 // --- /api/plays, /api/daily, /api/top-artists ---
 
+/**
+ * [nextBefore] is [NO_CURSOR] when the field is missing (a warehouse from before the cursor) and
+ * null when it's there and null (no more pages).
+ */
 @Serializable
-internal data class PlaysDto(val plays: List<PlayDto?> = emptyList())
+internal data class PlaysDto(
+    val plays: List<PlayDto?> = emptyList(),
+    @SerialName("next_before") val nextBefore: String? = NO_CURSOR,
+)
+
+internal const val NO_CURSOR = "\u0000none"
 
 @Serializable
 internal data class PlayDto(

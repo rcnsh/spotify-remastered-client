@@ -13,8 +13,13 @@ import java.time.ZoneId
  */
 interface Warehouse {
     // History
-    /** Newest first. Page back with `beforeMs = plays.last().playedAtMs`. [limit] is 1–500. */
+    /** Newest first, plays strictly before [beforeMs]. To page through, use [playsPage]. [limit] is 1–500. */
     suspend fun plays(limit: Int = 50, beforeMs: Long? = null, afterMs: Long? = null): List<Play>
+    /**
+     * A page of plays, newest first, before [before]: a previous page's [PlayPage.nextBefore], or an
+     * epoch ms as a string. The cursor keeps plays that share a millisecond from being skipped.
+     */
+    suspend fun playsPage(limit: Int = 50, before: String? = null): PlayPage
     /** Plays per local day, every day in the range included (quiet days are 0). At most 3,660 days. */
     suspend fun daily(from: LocalDate, to: LocalDate, zone: ZoneId = ZoneId.systemDefault()): DailyPlays
     /** Every artist on a track counts, not just the lead. [limit] is 1–500. */
