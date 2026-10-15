@@ -19,7 +19,8 @@ Where the client is. Tick tasks here in the same change that finishes them.
   - [x] Sign in with Spotify for the warehouse (its `/auth/login` with PKCE, redirect to
         `app.remastered://warehouse-auth`), next to the pasted token
   - [x] Home ranked from the history (warehouse `/api/home`): shortcuts by frecency and
-        time of day, Jump back in, Around this time, Rediscover; recently played as fallback
+        time of day, Jump back in, Around this time, Rediscover; recently played as fallback.
+        Verified on the phone: all four rows load, nothing repeats, a card opens its album
 
 ## Open
 - [ ] Warehouse sign-in on the phone: a real sign-in end to end (unit tests and the redirect
@@ -31,8 +32,6 @@ Where the client is. Tick tasks here in the same change that finishes them.
 - [ ] Screen cache (`ScreenCache`, keeps loaded screens while moving between them):
       not yet verified on the phone.
 - [ ] Lyrics with real playback on the phone.
-- [ ] Home from `/api/home` on the phone: the four rows load and open, Liked Songs stays
-      first, and nothing repeats between rows (unit tests and the live route only so far).
 - [ ] Rate limits: Liked Songs saved on the phone (a start fetches only new likes), and a 429
       blocks its endpoint until `Retry-After` passes, across restarts. Verified on the phone
       while limited (one request per endpoint, then none; the message shows the wait). Left:
