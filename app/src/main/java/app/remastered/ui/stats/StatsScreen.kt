@@ -375,12 +375,15 @@ private fun Legend(names: List<String>) {
 private fun ErasSection(data: WLoaded<Eras>) {
     WarehouseSection("Eras", data) { e ->
         val s = e.summary
-        if (!e.ready || s == null) {
-            Empty("Comparing eras needs ${e.windowMonths} whole months since the move" + (e.moveMonth?.let { " (${monthSpan(it, it)})" } ?: "") + ".")
+        val since = e.latestEra?.let { "Since ${it.label}" } ?: "Since the move"
+        if (e.moveMonth == null) {
+            Empty("The warehouse has one era, so there's no move to compare across.")
+        } else if (!e.ready || s == null) {
+            Empty("Comparing eras needs at least a whole month since the move (${monthSpan(e.moveMonth, e.moveMonth)}), and history from before it.")
         } else {
             Panel {
-                Text("Since the move", style = Type.label, color = Palette.sub)
-                SubText(dotted(e.singapore?.let { monthSpan(it.from, it.to) }, "against " + (e.before?.let { monthSpan(it.from, it.to) } ?: "the months before")), color = Palette.dim)
+                Text(since, style = Type.label, color = Palette.sub)
+                SubText(dotted(e.latest?.let { monthSpan(it.from, it.to) }, "against " + (e.before?.let { monthSpan(it.from, it.to) } ?: "the months before")), color = Palette.dim)
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
                     Stat(percent(s.knownArtistShare), "to artists you knew", Modifier.weight(1f))
                     Stat("%,d".format(s.newArtists), "new of %,d artists".format(s.artists), Modifier.weight(1f))
@@ -395,15 +398,16 @@ private fun ErasSection(data: WLoaded<Eras>) {
                     if (tc.exceededBy == 0) "None of ${tc.windows} earlier ones changed more." else "${tc.exceededBy} of ${tc.windows} earlier ones changed more.",
                     style = Type.caption, color = Palette.sub, modifier = Modifier.padding(top = 6.dp))
             }
-            ShareColumns("Before", e.topBefore, "Since", e.topSingapore)
+            ShareColumns("Before", e.topBefore, "Since", e.topLatest)
             ShiftList("Rising", e.risers)
             ShiftList("Falling", e.fallers)
         }
-        if (e.topNewcastle.isNotEmpty()) {
-            Text("The whole era before", style = Type.body, color = Palette.text, modifier = Modifier.padding(start = 20.dp, top = 22.dp))
+        if (e.topEarlier.isNotEmpty()) {
+            Text(e.latestEra?.let { "Everything before ${it.label}" } ?: "The whole era before", style = Type.body, color = Palette.text,
+                modifier = Modifier.padding(start = 20.dp, top = 22.dp))
             Column(Modifier.padding(top = 4.dp)) {
-                val max = e.topNewcastle.first().share.toFloat().takeIf { it > 0 } ?: 1f
-                e.topNewcastle.forEach { ShareRow(it.artist, percent(it.share), it.share.toFloat() / max) }
+                val max = e.topEarlier.first().share.toFloat().takeIf { it > 0 } ?: 1f
+                e.topEarlier.forEach { ShareRow(it.artist, percent(it.share), it.share.toFloat() / max) }
             }
         }
     }

@@ -295,28 +295,44 @@ class WarehouseApiTest {
     }
 
     @Test fun `eras, ready and not yet`() = runTest {
-        enqueue("""{"as_of":"2026-10-01T00:00:00.000Z","move_month":"2026-07","window_months":2,
-            "singapore":{"from":"2026-08","to":"2026-09"},"before":{"from":"2026-05","to":"2026-06"},"ready":true,
+        enqueue("""{"as_of":"2026-10-01T00:00:00.000Z","latest_era":{"key":"b","label":"Bayview"},"previous_era":{"key":"a","label":"Ashford"},
+            "move_month":"2026-07","window_months":2,
+            "latest":{"from":"2026-08","to":"2026-09"},"before":{"from":"2026-05","to":"2026-06"},"ready":true,
             "summary":{"known_artist_share":0.967,"new_artists":76,"artists":322,"change":0.735,
                        "typical_change":{"median":0.447,"min":0.218,"max":0.844,"windows":35,"exceeded_by":1}},
-            "top":{"newcastle":[{"artist":"Ada","share":0.116}],"before":[{"artist":"Bea","share":0.6}],"singapore":[{"artist":"Cy","share":0.125}]},
+            "top":{"earlier":[{"artist":"Ada","share":0.116}],"before":[{"artist":"Bea","share":0.6}],"latest":[{"artist":"Cy","share":0.125}]},
             "risers":[{"artist":"Cy","before":0,"after":0.125}],"fallers":[{"artist":"Bea","before":0.6,"after":0.12}]}""")
-        enqueue("""{"as_of":"2026-10-01T00:00:00.000Z","move_month":null,"window_months":0,"singapore":null,"before":null,
-            "ready":false,"summary":null,"top":{"newcastle":[],"before":[],"singapore":[]},"risers":[],"fallers":[]}""")
+        enqueue("""{"as_of":"2026-10-01T00:00:00.000Z","latest_era":null,"previous_era":null,"move_month":null,"window_months":0,
+            "latest":null,"before":null,"ready":false,"summary":null,"top":{"earlier":[],"before":[],"latest":[]},"risers":[],"fallers":[]}""")
         val e = api.eras()
         assertEquals("/api/stats/eras", take().path)
         assertTrue(e.ready)
+        assertEquals("Bayview", e.latestEra?.label)
+        assertEquals("a", e.previousEra?.key)
         assertEquals(YearMonth.of(2026, 7), e.moveMonth)
-        assertEquals(YearMonth.of(2026, 8), e.singapore?.from)
+        assertEquals(YearMonth.of(2026, 8), e.latest?.from)
         assertEquals(35, e.summary?.typicalChange?.windows)
-        assertEquals("Ada", e.topNewcastle.single().artist)
+        assertEquals("Ada", e.topEarlier.single().artist)
+        assertEquals("Cy", e.topLatest.single().artist)
         assertEquals(0.125, e.risers.single().after, 0.0)
 
         val empty = api.eras()
         assertFalse(empty.ready)
         assertNull(empty.summary)
         assertNull(empty.moveMonth)
-        assertTrue(empty.topSingapore.isEmpty())
+        assertNull(empty.latestEra)
+        assertTrue(empty.topLatest.isEmpty())
+    }
+
+    @Test fun `eras from a warehouse before configurable eras`() = runTest {
+        enqueue("""{"as_of":"2026-10-01T00:00:00.000Z","move_month":"2026-07","window_months":2,
+            "singapore":{"from":"2026-08","to":"2026-09"},"before":{"from":"2026-05","to":"2026-06"},"ready":false,"summary":null,
+            "top":{"newcastle":[{"artist":"Ada","share":0.116}],"before":[],"singapore":[{"artist":"Cy","share":0.125}]},"risers":[],"fallers":[]}""")
+        val e = api.eras()
+        assertNull(e.latestEra)
+        assertEquals(YearMonth.of(2026, 8), e.latest?.from)
+        assertEquals("Ada", e.topEarlier.single().artist)
+        assertEquals("Cy", e.topLatest.single().artist)
     }
 
     @Test fun `top albums`() = runTest {

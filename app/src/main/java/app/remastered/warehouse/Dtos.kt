@@ -251,11 +251,17 @@ internal data class LeaderDto(val name: String? = null, val plays: Int = 0, val 
 
 // --- /api/stats/eras ---
 
+// Eras became configurable on the warehouse (2026-10-15): `latest` and `top.earlier`/`top.latest`
+// replaced the hardcoded `singapore` and `top.newcastle`/`top.singapore`. The old names are still
+// read, for a warehouse not yet redeployed.
 @Serializable
 internal data class ErasDto(
     @SerialName("as_of") val asOf: String? = null,
+    @SerialName("latest_era") val latestEra: EraNameDto? = null,
+    @SerialName("previous_era") val previousEra: EraNameDto? = null,
     @SerialName("move_month") val moveMonth: String? = null,
     @SerialName("window_months") val windowMonths: Int = 0,
+    val latest: MonthRangeDto? = null,
     val singapore: MonthRangeDto? = null,
     val before: MonthRangeDto? = null,
     val ready: Boolean = false,
@@ -284,9 +290,14 @@ internal data class TypicalChangeDto(
 )
 
 @Serializable
+internal data class EraNameDto(val key: String? = null, val label: String? = null)
+
+@Serializable
 internal data class DriftTopDto(
-    val newcastle: List<ArtistShareDto?> = emptyList(),
+    val earlier: List<ArtistShareDto?>? = null,
     val before: List<ArtistShareDto?> = emptyList(),
+    val latest: List<ArtistShareDto?>? = null,
+    val newcastle: List<ArtistShareDto?> = emptyList(),
     val singapore: List<ArtistShareDto?> = emptyList(),
 )
 
