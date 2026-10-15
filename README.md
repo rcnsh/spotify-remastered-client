@@ -91,3 +91,7 @@ file's uri) starts a video export. In the app it's under Settings → Wrapped pr
 - `docs/design/mockups/`: the design the screens follow.
 - `docs/PLAN.md`: what is built and what is open.
 - `scripts/emulator.sh`: boots the dev emulator, for previews that don't need Spotify.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
