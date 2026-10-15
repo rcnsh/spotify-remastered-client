@@ -28,8 +28,11 @@ enum class RangePreset(val label: String, val days: Int) {
     fun resolve(today: LocalDate) = DayRange(today.minusDays(days - 1L), today)
 }
 
-/** The warehouse's `/api/daily` limit. */
-const val MAX_RANGE_DAYS = 3_660
+/**
+ * One day under the warehouse's `/api/daily` limit (3,660 local calendar days, counted in its
+ * zone), so a range at the edge isn't refused with a 400.
+ */
+const val MAX_RANGE_DAYS = 3_659
 
 /** A picked range made valid: in order, not past [today], at most [MAX_RANGE_DAYS] (keeping the end). */
 fun customRange(from: LocalDate, to: LocalDate, today: LocalDate): DayRange {
