@@ -72,18 +72,57 @@ class HistoryFeedTest {
 
     // --- paging ---
 
-    /** A fake `/api/plays` over [all] (any order): newest first, `before` exclusive. */
-    private class FakePlays(all: List<Play>) {
-        val sorted = all.sortedByDescending { it.playedAtMs }
-        val calls = mutableListOf<Long?>()
-        suspend fun fetch(before: Long?, limit: Int): List<Play> {
+    /**
+     * A fake `/api/plays` over [all] (any order): newest first, then by track id descending, as the
+     * warehouse orders them. With [cursors], `before` takes and pages return its `<ms>.<track_id>`
+     * cursor, as the current warehouse does; without, it's an older one that only takes an epoch ms.
+     */
+    private class FakePlays(all: List<Play>, private val cursors: Boolean = true) {
+        val sorted = all.sortedWith(compareByDescending<Play> { it.playedAtMs }.thenByDescending { it.trackId })
+        val calls = mutableListOf<String?>()
+        suspend fun fetch(before: String?, limit: Int): PlayPage {
             calls += before
-            return sorted.filter { before == null || it.playedAtMs < before }.take(limit)
+            val cut = before?.split('.', limit = 2)
+            val ms = cut?.get(0)?.toLong()
+            val id = cut?.getOrNull(1)
+            val rest = sorted.filter { p -> ms == null || p.playedAtMs < ms || (id != null && p.playedAtMs == ms && p.trackId < id) }
+            val page = rest.take(limit)
+            if (!cursors) return PlayPage(page, null, cursored = false)
+            val next = if (rest.size > limit) page.last().let { "${it.playedAtMs}.${it.trackId}" } else null
+            return PlayPage(page, next, cursored = true)
         }
     }
 
-    @Test fun `pages back by before until a short page`() = runTest {
+    @Test fun `pages back by the warehouse's cursor until it's null`() = runTest {
         val api = FakePlays((1..7).map { play(it * 1_000L) })
+        val pager = PlayPager(pageSize = 3, fetch = api::fetch)
+        assertEquals(listOf(3, 3, 1), List(3) { pager.loadMore().size })
+        assertTrue(pager.done)
+        assertEquals(emptyList<Play>(), pager.loadMore())
+        assertEquals((7 downTo 1).map { it * 1_000L }, pager.plays.map { it.playedAtMs })
+        assertEquals(listOf(null, "5000.t5000", "2000.t2000"), api.calls)
+    }
+
+    @Test fun `with the cursor, plays sharing a millisecond across pages all arrive once`() = runTest {
+        // More ties than a page: time alone can't page through these without skipping some.
+        val ties = (1..5).map { play(4_000, "t$it") }
+        val api = FakePlays(listOf(play(5_000, "a")) + ties + play(3_000, "z"))
+        val pager = PlayPager(pageSize = 2, fetch = api::fetch)
+        while (!pager.done) pager.loadMore()
+        assertEquals(listOf("a", "t5", "t4", "t3", "t2", "t1", "z"), pager.plays.map { it.trackId })
+    }
+
+    @Test fun `a cursor that doesn't move ends paging instead of looping`() = runTest {
+        var calls = 0
+        val pager = PlayPager(pageSize = 1) { _, _ -> calls++; PlayPage(listOf(play(1_000)), "1000.x", cursored = true) }
+        pager.loadMore()
+        pager.loadMore()
+        assertTrue(pager.done)
+        assertEquals(2, calls)
+    }
+
+    @Test fun `an older warehouse without cursors pages by time until a short page`() = runTest {
+        val api = FakePlays((1..7).map { play(it * 1_000L) }, cursors = false)
         val pager = PlayPager(pageSize = 3, fetch = api::fetch)
         // Each page asks from one past the oldest so same-millisecond plays aren't skipped, so it
         // gets the oldest again and adds one fewer.
@@ -93,23 +132,23 @@ class HistoryFeedTest {
         assertTrue(pager.done)
         assertEquals(emptyList<Play>(), pager.loadMore())
         assertEquals((7 downTo 1).map { it * 1_000L }, pager.plays.map { it.playedAtMs })
-        assertEquals(listOf(null, 5_001L, 3_001L, 1_001L), api.calls)
+        assertEquals(listOf(null, "5001", "3001", "1001"), api.calls)
     }
 
-    @Test fun `plays sharing a millisecond across a page boundary all arrive once`() = runTest {
-        val api = FakePlays(listOf(play(5_000, "a"), play(4_000, "b"), play(4_000, "c"), play(3_000, "d")))
+    @Test fun `without cursors, plays sharing a millisecond across a page boundary all arrive once`() = runTest {
+        val api = FakePlays(listOf(play(5_000, "a"), play(4_000, "b"), play(4_000, "c"), play(3_000, "d")), cursors = false)
         val pager = PlayPager(pageSize = 2, fetch = api::fetch)
         while (!pager.done) pager.loadMore()
         assertEquals(listOf("a", "b", "c", "d").sorted(), pager.plays.map { it.trackId }.sorted())
         assertEquals(4, pager.plays.size)
     }
 
-    @Test fun `a full page of ties steps past that millisecond instead of looping`() = runTest {
-        val api = FakePlays(listOf(play(5_000, "a"), play(5_000, "b"), play(1_000, "z")))
+    @Test fun `without cursors, a full page of ties steps past that millisecond instead of looping`() = runTest {
+        val api = FakePlays(listOf(play(5_000, "a"), play(5_000, "b"), play(1_000, "z")), cursors = false)
         val pager = PlayPager(pageSize = 2, fetch = api::fetch)
         pager.loadMore()
         assertEquals(emptyList<Play>(), pager.loadMore())
-        assertEquals(5_000L, pager.nextBeforeMs)
+        assertEquals("5000", pager.nextBefore)
         assertEquals(listOf("z"), pager.loadMore().map { it.trackId })
         assertTrue(pager.done)
     }
@@ -119,14 +158,14 @@ class HistoryFeedTest {
         val pager = PlayPager(startBeforeMs = 3_000, pageSize = 10, fetch = api::fetch)
         pager.loadMore()
         assertEquals(listOf(2_000L, 1_000L), pager.plays.map { it.playedAtMs })
-        assertEquals(3_000L, api.calls.single())
+        assertEquals("3000", api.calls.single())
     }
 
     @Test fun `an empty warehouse is done at once`() = runTest {
         val pager = PlayPager(fetch = FakePlays(emptyList())::fetch)
         pager.loadMore()
         assertTrue(pager.done)
-        assertNull(pager.nextBeforeMs)
+        assertNull(pager.nextBefore)
     }
 
     // --- days ---

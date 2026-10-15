@@ -1,0 +1,33 @@
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 21
+      # Caches Gradle's dependencies and build cache; validates the wrapper jar.
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      # Spotify's App Remote and Auth AARs, checked against pinned SHA-256s (not committed).
+      - run: scripts/fetch-spotify-sdk.sh
+      # No local.properties: the build uses $ANDROID_HOME and builds without Spotify app settings,
+      # lyrics key or warehouse (each feature then says it isn't set up). No secrets needed.
+      - run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug

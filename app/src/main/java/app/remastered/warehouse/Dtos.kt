@@ -8,13 +8,23 @@ import kotlinx.serialization.Serializable
 // instead of failing the whole response; mapping (Mapping.kt) drops entries without what they need.
 // Minutes and shares are Double: the warehouse rounds them today, but a fraction must still decode.
 
+/** [needsReauth]: a 503 because the warehouse's own Spotify grant lapsed (live routes), not "still computing". */
 @Serializable
-internal data class ErrorDto(val error: String? = null)
+internal data class ErrorDto(val error: String? = null, @SerialName("needs_reauth") val needsReauth: Boolean = false)
 
 // --- /api/plays, /api/daily, /api/top-artists ---
 
+/**
+ * [nextBefore] is [NO_CURSOR] when the field is missing (a warehouse from before the cursor) and
+ * null when it's there and null (no more pages).
+ */
 @Serializable
-internal data class PlaysDto(val plays: List<PlayDto?> = emptyList())
+internal data class PlaysDto(
+    val plays: List<PlayDto?> = emptyList(),
+    @SerialName("next_before") val nextBefore: String? = NO_CURSOR,
+)
+
+internal const val NO_CURSOR = "\u0000none"
 
 @Serializable
 internal data class PlayDto(
@@ -242,11 +252,17 @@ internal data class LeaderDto(val name: String? = null, val plays: Int = 0, val 
 
 // --- /api/stats/eras ---
 
+// Eras became configurable on the warehouse (2026-10-15): `latest` and `top.earlier`/`top.latest`
+// replaced the hardcoded `singapore` and `top.newcastle`/`top.singapore`. The old names are still
+// read, for a warehouse not yet redeployed.
 @Serializable
 internal data class ErasDto(
     @SerialName("as_of") val asOf: String? = null,
+    @SerialName("latest_era") val latestEra: EraNameDto? = null,
+    @SerialName("previous_era") val previousEra: EraNameDto? = null,
     @SerialName("move_month") val moveMonth: String? = null,
     @SerialName("window_months") val windowMonths: Int = 0,
+    val latest: MonthRangeDto? = null,
     val singapore: MonthRangeDto? = null,
     val before: MonthRangeDto? = null,
     val ready: Boolean = false,
@@ -275,9 +291,14 @@ internal data class TypicalChangeDto(
 )
 
 @Serializable
+internal data class EraNameDto(val key: String? = null, val label: String? = null)
+
+@Serializable
 internal data class DriftTopDto(
-    val newcastle: List<ArtistShareDto?> = emptyList(),
+    val earlier: List<ArtistShareDto?>? = null,
     val before: List<ArtistShareDto?> = emptyList(),
+    val latest: List<ArtistShareDto?>? = null,
+    val newcastle: List<ArtistShareDto?> = emptyList(),
     val singapore: List<ArtistShareDto?> = emptyList(),
 )
 

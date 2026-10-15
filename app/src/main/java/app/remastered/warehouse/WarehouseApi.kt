@@ -7,6 +7,7 @@ import app.remastered.core.warehouse.HomeFeed
 import app.remastered.core.warehouse.OnRepeat
 import app.remastered.core.warehouse.OnThisDay
 import app.remastered.core.warehouse.Play
+import app.remastered.core.warehouse.PlayPage
 import app.remastered.core.warehouse.Rhythm
 import app.remastered.core.warehouse.TopAlbums
 import app.remastered.core.warehouse.TopArtists
@@ -41,7 +42,8 @@ import okhttp3.Request
  *
  * A 503 with `Retry-After` means a stat is being computed: it's retried up to [MAX_BUSY_RETRIES]
  * times, waiting as asked (at most [MAX_RETRY_AFTER_S] each), and the wait is cancelled with the
- * caller. Nothing else is retried. [onOutcome] hears every call's path and result (null for
+ * caller. A 503 with `needs_reauth` (the warehouse's Spotify grant lapsed, live routes only) is
+ * never retried: only the owner re-authorizing fixes it. Nothing else is retried. [onOutcome] hears every call's path and result (null for
  * success) so [WarehouseServices] can keep its state current. [sleep] is injectable so tests
  * don't wait.
  */
@@ -59,6 +61,15 @@ class WarehouseApi(
             beforeMs?.let { add("before", it) }
             afterMs?.let { add("after", it) }
         }.plays.mapNotNull { it?.toModel() }
+
+    override suspend fun playsPage(limit: Int, before: String?): PlayPage =
+        get<PlaysDto>("api/plays") {
+            add("limit", limit.coerceIn(1, 500))
+            before?.let { add("before", it) }
+        }.let { dto ->
+            val cursored = dto.nextBefore != NO_CURSOR
+            PlayPage(dto.plays.mapNotNull { it?.toModel() }, dto.nextBefore.takeIf { cursored }, cursored)
+        }
 
     override suspend fun daily(from: LocalDate, to: LocalDate, zone: ZoneId): DailyPlays =
         get<DailyDto>("api/daily") { range(from, to); add("tz", zone.id) }.toModel(from, to, zone.id)
@@ -160,35 +171,43 @@ class WarehouseApi(
                 return reply.body
             }
             val retryAfterS = reply.retryAfter?.trim()?.toLongOrNull()?.takeIf { it >= 0 }
-            if (reply.code == 503 && retryAfterS != null && retryAfterS <= MAX_RETRY_AFTER_S && busyRetries < MAX_BUSY_RETRIES) {
+            val said = errorBody(reply.body)
+            val computing = reply.code == 503 && retryAfterS != null && said?.needsReauth != true
+            if (computing && retryAfterS!! <= MAX_RETRY_AFTER_S && busyRetries < MAX_BUSY_RETRIES) {
                 busyRetries++
                 // OkHttp already retried a `Retry-After: 0` once; wait at least a second after that.
                 sleep(retryAfterS.coerceAtLeast(1) * 1000)
                 continue
             }
-            throw report(path, error(reply, retryAfterS))
+            throw report(path, error(reply.code, said, retryAfterS.takeIf { computing || reply.code == 429 }))
         }
     }
 
     private class Reply(val code: Int, val retryAfter: String?, val body: String)
 
-    /** Maps a non-2xx reply; the warehouse's `{"error": "…"}` becomes the message where it's useful. */
-    private fun error(reply: Reply, retryAfterS: Long?): WarehouseException {
-        val said = try {
-            json.decodeFromString<ErrorDto>(reply.body).error
-        } catch (_: Exception) {
-            null // Not JSON (a Cloudflare error page, say).
-        }
+    /** The warehouse's `{"error": "…"}`, or null when the body isn't one (a Cloudflare error page, say). */
+    private fun errorBody(body: String): ErrorDto? = try {
+        json.decodeFromString<ErrorDto>(body)
+    } catch (_: Exception) {
+        null
+    }
+
+    /**
+     * Maps a non-2xx reply; the warehouse's message becomes ours where it's useful. [retryAfterS] is
+     * set only for a wait worth waiting (still computing, or rate limited).
+     */
+    private fun error(code: Int, said: ErrorDto?, retryAfterS: Long?): WarehouseException {
+        val needsReauth = code == 503 && said?.needsReauth == true
         val problem = when {
-            reply.code == 400 -> Problem.BadRequest
-            reply.code == 401 -> Problem.Unauthorized
-            reply.code == 403 -> Problem.Forbidden
-            reply.code == 404 -> Problem.NotFound
-            reply.code == 429 || (reply.code == 503 && retryAfterS != null) -> Problem.Busy
-            reply.code >= 500 -> Problem.ServerError
+            code == 400 -> Problem.BadRequest
+            code == 401 -> Problem.Unauthorized
+            code == 403 -> Problem.Forbidden
+            code == 404 -> Problem.NotFound
+            code == 429 || (code == 503 && retryAfterS != null) -> Problem.Busy
+            code >= 500 -> Problem.ServerError
             else -> Problem.BadRequest
         }
-        return WarehouseException(problem, said ?: "The warehouse answered ${reply.code}", reply.code, retryAfterS)
+        return WarehouseException(problem, said?.error ?: "The warehouse answered $code", code, retryAfterS, needsReauth = needsReauth)
     }
 
     private fun report(path: String, e: WarehouseException): WarehouseException = e.also { onOutcome(path, it) }

@@ -51,7 +51,8 @@ Related repos in `~/dev`:
   binaries, no personal data in fixtures).
 
 ### Warehouse
-- The phone holds the **READ_TOKEN only**, never ADMIN_TOKEN. READ_TOKEN can compute only
+- The phone holds a **read token only** (a `read` device token, which "Sign in with Spotify"
+  mints, or the deprecated shared READ_TOKEN), never ADMIN_TOKEN. A read token can compute only
   the preset Wrapped ranges (ADR 0006).
 - Response shapes are kept by hand on both sides: change the Worker and the client
   together, and decode leniently in the client.
@@ -110,6 +111,6 @@ cd ~/dev/music-warehouse && npm test && npx tsc --noEmit
   the export bitrate; judge export size on the phone.
 - Debug preview extras are only read on a fresh launch: use `am start -S`.
 - Logging in requires the user. Never ask for Spotify credentials in chat.
-- The warehouse runs at `https://music-api.rcn.sh`; its WAF rejects requests without an
-  `Authorization` header. Tokens for local dev are in `~/dev/music-warehouse/.dev.vars`
+- The warehouse's address is `warehouse.url` in `local.properties` (never commit it: this repo
+  is public); its WAF rejects requests without an `Authorization` header. Tokens for local dev are in `~/dev/music-warehouse/.dev.vars`
   (gitignored): read them in shell, never print them.

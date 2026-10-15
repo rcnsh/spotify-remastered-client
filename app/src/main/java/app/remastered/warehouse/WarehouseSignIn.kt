@@ -1,5 +1,6 @@
 package app.remastered.warehouse
 
+import android.annotation.SuppressLint
 import android.content.Context
 import app.remastered.spotify.auth.Pkce
 import app.remastered.spotify.web.await
@@ -184,6 +185,7 @@ class PrefsPendingSignInStore(context: Context) : PendingSignInStore {
     }
 
     // commit(): the Custom Tab may get us killed right after launch; the verifier must be on disk.
+    @SuppressLint("ApplySharedPref")
     override fun save(pending: PendingSignIn) {
         prefs.edit().putString(URL, pending.baseUrl).putString(VERIFIER, pending.verifier).putLong(STARTED, pending.startedMs).commit()
     }

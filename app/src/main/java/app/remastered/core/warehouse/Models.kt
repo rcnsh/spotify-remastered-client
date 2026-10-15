@@ -42,6 +42,13 @@ data class Play(
     val playedAt: Instant get() = Instant.ofEpochMilli(playedAtMs)
 }
 
+/**
+ * One page of plays, newest first. [nextBefore] is the warehouse's opaque cursor for the page
+ * after it (pass it back as `before`), null once there's nothing older. [cursored] is false for a
+ * warehouse too old to send a cursor at all; page those by time instead (see [PlayPager]).
+ */
+data class PlayPage(val plays: List<Play>, val nextBefore: String?, val cursored: Boolean)
+
 data class DayPlays(val day: LocalDate, val plays: Int)
 
 data class DailyPlays(val from: LocalDate, val to: LocalDate, val timeZone: String, val days: List<DayPlays>)
@@ -236,22 +243,28 @@ data class DriftSummary(
     val typicalChange: TypicalChange,
 )
 
+/** One of the warehouse's configured eras (its `ERAS`), e.g. a city lived in. */
+data class EraName(val key: String, val label: String)
+
 /**
- * Artist drift across the move from Newcastle to Singapore: the [windowMonths] whole months
- * after it ([singapore]) against as many just before it ([before]). [summary] is null until [ready].
+ * Artist drift across the move into the warehouse's latest era ([latestEra], from [previousEra]):
+ * the [windowMonths] whole months after it ([latest]) against as many just before it ([before]).
+ * [summary] is null until [ready]. Both eras are null when the warehouse has only one.
  */
 data class Eras(
     val asOf: Instant?,
+    val latestEra: EraName?,
+    val previousEra: EraName?,
     val moveMonth: YearMonth?,
     val windowMonths: Int,
-    val singapore: MonthRange?,
+    val latest: MonthRange?,
     val before: MonthRange?,
     val ready: Boolean,
     val summary: DriftSummary?,
-    /** Top artists of the whole Newcastle era. */
-    val topNewcastle: List<ArtistShare>,
+    /** Top artists of all history before the latest era began. */
+    val topEarlier: List<ArtistShare>,
     val topBefore: List<ArtistShare>,
-    val topSingapore: List<ArtistShare>,
+    val topLatest: List<ArtistShare>,
     val risers: List<ArtistShift>,
     val fallers: List<ArtistShift>,
 )

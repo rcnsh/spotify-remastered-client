@@ -59,42 +59,49 @@ fun mergeRecent(stored: List<Play>, recent: List<Play>, complete: Boolean, toler
 }
 
 /**
- * Pages back through the warehouse's plays, newest first. `before` is exclusive and plays are keyed
- * by (time, track), so each page asks for `oldest + 1` and drops what it already has: two plays
- * stored at the same millisecond can't be split across pages and lost. Not thread-safe: call
- * [loadMore] from one coroutine at a time.
+ * Pages back through the warehouse's plays, newest first, with the `next_before` cursor each page
+ * returns: it resumes after exactly the last play, so plays sharing a millisecond are neither
+ * skipped nor repeated, and a null cursor means there's nothing older.
+ *
+ * A warehouse too old to send the cursor is paged by time instead. `before` is exclusive and plays
+ * are keyed by (time, track), so each page asks for `oldest + 1` and drops what it already has.
+ * Not thread-safe: call [loadMore] from one coroutine at a time.
  */
 class PlayPager(
     /** Start from plays before this (exclusive); null for the newest. */
-    private val startBeforeMs: Long? = null,
+    startBeforeMs: Long? = null,
     private val pageSize: Int = 50,
-    private val fetch: suspend (beforeMs: Long?, limit: Int) -> List<Play>,
+    private val fetch: suspend (before: String?, limit: Int) -> PlayPage,
 ) {
     var plays: List<Play> = emptyList()
         private set
-    /** True once a page came back short: there's nothing older. */
+    /** True once there's nothing older: a null cursor, or (without cursors) a short page. */
     var done = false
         private set
-    private var stalled = false
 
     /** The `before` the next [loadMore] will send. */
-    val nextBeforeMs: Long?
-        get() {
-            val oldest = plays.lastOrNull() ?: return startBeforeMs
-            return if (stalled) oldest.playedAtMs else oldest.playedAtMs + 1
-        }
+    var nextBefore: String? = startBeforeMs?.toString()
+        private set
 
     /** Fetches the next page and returns the plays it added (none once [done]). */
     suspend fun loadMore(): List<Play> {
         if (done) return emptyList()
-        val page = fetch(nextBeforeMs, pageSize)
+        val sent = nextBefore
+        val page = fetch(sent, pageSize)
         val seen = plays.mapTo(HashSet()) { it.key }
-        val fresh = page.filter { seen.add(it.key) }
+        val fresh = page.plays.filter { seen.add(it.key) }
         plays = plays + fresh
-        done = page.size < pageSize
-        // A full page of plays we already had (only possible with more same-millisecond plays than a
-        // page): step past that millisecond next time rather than asking for the same page forever.
-        stalled = fresh.isEmpty() && !done
+        if (page.cursored) {
+            // A cursor that doesn't move would ask for the same page forever.
+            done = page.nextBefore == null || page.nextBefore == sent
+            nextBefore = page.nextBefore
+        } else {
+            done = page.plays.size < pageSize
+            // A full page of plays we already had (only possible with more same-millisecond plays
+            // than a page): step past that millisecond rather than asking for the same page forever.
+            val stalled = fresh.isEmpty() && !done
+            plays.lastOrNull()?.let { nextBefore = (if (stalled) it.playedAtMs else it.playedAtMs + 1).toString() }
+        }
         return fresh
     }
 
@@ -109,7 +116,7 @@ suspend fun recentContexts(
     want: Int,
     maxPages: Int = 4,
     pageSize: Int = 500,
-    fetch: suspend (beforeMs: Long?, limit: Int) -> List<Play>,
+    fetch: suspend (before: String?, limit: Int) -> PlayPage,
 ): List<ContextRef> {
     val pager = PlayPager(pageSize = pageSize, fetch = fetch)
     val out = LinkedHashMap<String, ContextRef>()

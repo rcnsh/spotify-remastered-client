@@ -13,6 +13,7 @@ import app.remastered.core.warehouse.DecadeShare
 import app.remastered.core.warehouse.Discoveries
 import app.remastered.core.warehouse.Discovery
 import app.remastered.core.warehouse.DriftSummary
+import app.remastered.core.warehouse.EraName
 import app.remastered.core.warehouse.EraRhythm
 import app.remastered.core.warehouse.Eras
 import app.remastered.core.warehouse.Leader
@@ -176,21 +177,28 @@ private fun PeriodDto.toModel(): Period? {
 
 internal fun ErasDto.toModel() = Eras(
     asOf = instant(asOf),
+    latestEra = latestEra.toModel(),
+    previousEra = previousEra.toModel(),
     moveMonth = month(moveMonth),
     windowMonths = windowMonths,
-    singapore = singapore?.let { MonthRange(month(it.from), month(it.to)) },
+    latest = (latest ?: singapore)?.let { MonthRange(month(it.from), month(it.to)) },
     before = before?.let { MonthRange(month(it.from), month(it.to)) },
     ready = ready,
     summary = summary?.let { s ->
         val t = s.typicalChange ?: TypicalChangeDto()
         DriftSummary(s.knownArtistShare, s.newArtists, s.artists, s.change, TypicalChange(t.median, t.min, t.max, t.windows, t.exceededBy))
     },
-    topNewcastle = top?.newcastle.shares(),
+    topEarlier = (top?.earlier ?: top?.newcastle).shares(),
     topBefore = top?.before.shares(),
-    topSingapore = top?.singapore.shares(),
+    topLatest = (top?.latest ?: top?.singapore).shares(),
     risers = risers.shifts(),
     fallers = fallers.shifts(),
 )
+
+private fun EraNameDto?.toModel(): EraName? {
+    val key = this?.key?.takeIf { it.isNotBlank() } ?: return null
+    return EraName(key, label?.takeIf { it.isNotBlank() } ?: key)
+}
 
 private fun List<ArtistShareDto?>?.shares() = orEmpty().mapNotNull { a -> a?.artist?.let { ArtistShare(it, a.share) } }
 

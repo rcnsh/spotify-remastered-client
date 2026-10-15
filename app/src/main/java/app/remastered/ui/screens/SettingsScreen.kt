@@ -292,7 +292,7 @@ private fun WarehouseGroup(app: AppState) {
     }
 
     Group("Listening history", "Your play history from your own music-warehouse, for History, Stats and Wrapped. " +
-        "Enter its address, then sign in with the Spotify account that owns it, or paste a READ_TOKEN. " +
+        "Enter its address, then sign in with the Spotify account that owns it, or paste a read token. " +
         "The token is stored encrypted on this phone and never shown or logged.") {
         val status = when (val s = state) {
             WarehouseState.NotConfigured -> "Not set up. History, Stats and Wrapped are hidden."
@@ -304,7 +304,7 @@ private fun WarehouseGroup(app: AppState) {
         Item("Status", if (missing.isEmpty() || state !is WarehouseState.Ready) status
             else "$status This warehouse doesn't serve ${missing.joinToString { it.name }} yet; those features stay hidden.")
         Field(url, { url = it }, "https://music-api.example.com")
-        Field(token, { token = it }, if (config != null) "Token saved. Type to replace it." else "READ_TOKEN", secret = true)
+        Field(token, { token = it }, if (config != null) "Token saved. Type to replace it." else "Read token", secret = true)
         FlowRow(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // Signing in is the way in until there's a working token; then Save is the main action again.
@@ -518,7 +518,7 @@ private fun UriToolGroup(app: AppState) {
 private fun WrappedPreviewGroup(app: AppState) {
     var range by remember { mutableStateOf("2025-01-01:2025-12-31") }
     val parsed = WrappedPreview.parse(range)
-    Group("Wrapped preview", "Any closed range as from:to. A read token can only open computed ranges.") {
+    Group("Wrapped preview", "Any closed range as from:to. A read token can open the presets and ranges already computed.") {
         Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
             .background(Palette.raised).padding(horizontal = 12.dp, vertical = 11.dp)) {
             BasicTextField(range, { range = it }, singleLine = true, textStyle = MonoStyle.copy(color = Palette.text),

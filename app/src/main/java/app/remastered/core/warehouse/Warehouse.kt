@@ -13,8 +13,13 @@ import java.time.ZoneId
  */
 interface Warehouse {
     // History
-    /** Newest first. Page back with `beforeMs = plays.last().playedAtMs`. [limit] is 1–500. */
+    /** Newest first, plays strictly before [beforeMs]. To page through, use [playsPage]. [limit] is 1–500. */
     suspend fun plays(limit: Int = 50, beforeMs: Long? = null, afterMs: Long? = null): List<Play>
+    /**
+     * A page of plays, newest first, before [before]: a previous page's [PlayPage.nextBefore], or an
+     * epoch ms as a string. The cursor keeps plays that share a millisecond from being skipped.
+     */
+    suspend fun playsPage(limit: Int = 50, before: String? = null): PlayPage
     /** Plays per local day, every day in the range included (quiet days are 0). At most 3,660 days. */
     suspend fun daily(from: LocalDate, to: LocalDate, zone: ZoneId = ZoneId.systemDefault()): DailyPlays
     /** Every artist on a track counts, not just the lead. [limit] is 1–500. */
@@ -40,7 +45,8 @@ interface Warehouse {
     /** Ranges worth offering, with whether each has been computed (a read token can only open those). */
     suspend fun wrappedRanges(): List<WrappedRange>
     /**
-     * A year-in-review for a closed range ending before today. With a read token, a range nobody
+     * A year-in-review for a closed range ending before today. With a read token, a preset range
+     * from [wrappedRanges] is computed on first open (it can take a while); any other range nobody
      * computed yet fails with [WarehouseException.Problem.Forbidden].
      */
     suspend fun wrapped(from: LocalDate, to: LocalDate): Wrapped
@@ -67,6 +73,8 @@ class WarehouseException(
     /** Seconds the warehouse asked us to wait (503 while a stat is being computed). */
     val retryAfterS: Long? = null,
     cause: Throwable? = null,
+    /** A 503 because the warehouse's Spotify grant lapsed: its owner must re-authorize it; retrying won't help. */
+    val needsReauth: Boolean = false,
 ) : Exception(message, cause) {
     enum class Problem {
         /** No URL or token set in Settings. Nothing was sent. */
@@ -81,7 +89,7 @@ class WarehouseException(
         BadRequest,
         /** 503 that outlasted our retries: the warehouse is still computing. */
         Busy,
-        /** Any other 5xx. */
+        /** Any other 5xx, including a lapsed Spotify grant ([needsReauth]). */
         ServerError,
         /** No response: offline, DNS, TLS, timeout. */
         Unreachable,
@@ -98,7 +106,9 @@ class WarehouseException(
             Problem.NotFound -> "The warehouse has nothing here."
             Problem.BadRequest -> message ?: "The warehouse refused that request."
             Problem.Busy -> "The warehouse is still working this out. Try again in a minute."
-            Problem.ServerError -> "The warehouse had a problem. Try again later."
+            Problem.ServerError ->
+                if (needsReauth) "The warehouse's Spotify connection needs re-authorizing by its owner. Stored history still works."
+                else "The warehouse had a problem. Try again later."
             Problem.Unreachable -> "Can't reach the warehouse. Check your connection."
             Problem.BadResponse -> "The warehouse sent something this version can't read."
         }

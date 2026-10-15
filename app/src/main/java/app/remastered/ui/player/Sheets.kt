@@ -94,7 +94,8 @@ private fun MenuItem(icon: ImageVector, label: String, accent: Boolean = false, 
 @Composable
 fun TrackMenuSheet(app: AppState, menu: TrackMenu) {
     val t = menu.track
-    val liked = app.c.liked.uris.collectAsState().value.contains(t.uri) || app.c.player.state.value?.track?.let { it.uri == t.uri && it.liked } == true
+    val liked = app.c.liked.uris.collectAsState().value.contains(t.uri) ||
+        app.c.player.state.collectAsState().value?.track?.let { it.uri == t.uri && it.liked } == true
     fun then(action: () -> Unit) { app.menu = null; action() }
     Sheet({ app.menu = null }) {
         Row(Modifier.padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {

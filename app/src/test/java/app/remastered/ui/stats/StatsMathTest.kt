@@ -32,7 +32,7 @@ class StatsMathTest {
         assertEquals(today, customRange(LocalDate.of(2026, 10, 1), LocalDate.of(2027, 1, 1), today).to)
         assertEquals(DayRange(today, today), customRange(LocalDate.of(2027, 1, 1), LocalDate.of(2027, 2, 1), today))
         val long = customRange(LocalDate.of(2000, 1, 1), today, today)
-        assertEquals(MAX_RANGE_DAYS, long.days)
+        assertEquals(3_659, long.days)
         assertEquals(today, long.to)
     }
 

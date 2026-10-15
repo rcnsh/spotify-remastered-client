@@ -1,6 +1,6 @@
 package app.remastered.ui
 
-import android.app.Activity
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -51,7 +51,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
@@ -65,7 +64,7 @@ import kotlinx.coroutines.launch
 /** First run in Spotify mode: Web API sign-in (PKCE, through Spotify's auth screen). */
 @Composable
 fun SignInScreen(spotify: SpotifyServices) {
-    val activity = LocalContext.current as Activity
+    val activity = LocalActivity.current
     val scope = rememberCoroutineScope()
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -100,9 +99,11 @@ fun SignInScreen(spotify: SpotifyServices) {
             }
 
             PrimaryButton("Continue with Spotify", busy = busy, modifier = Modifier.padding(top = 28.dp)) {
-                error = null
-                busy = true
-                launcher.launch(spotify.loginIntent(activity))
+                if (activity != null) {
+                    error = null
+                    busy = true
+                    launcher.launch(spotify.loginIntent(activity))
+                }
             }
             Text("You sign in on Spotify's own page. Playback goes through the Spotify app on this phone.",
                 style = Type.caption, color = Palette.dim, textAlign = TextAlign.Center,
