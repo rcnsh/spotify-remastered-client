@@ -1,12 +1,17 @@
 package app.remastered.core
 
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class ScreenCacheTest {
+    @get:Rule val tmp = TemporaryFolder()
     private var now = 0L
     private val cache = ScreenCache({ now }, capacity = 2)
 
@@ -51,5 +56,32 @@ class ScreenCacheTest {
         cache.put("a", 1, emptyList())
         cache.clear()
         assertNull(cache.get("a"))
+    }
+
+    @Test fun savedEntryIsRestoredInANewRunAndAgesByWallClock() {
+        val dir = tmp.newFolder("screens")
+        var wall = 1_700_000_000_000L
+        ScreenCache({ now }, dir = dir, wallClock = { wall }).save("library", listOf("a", "b"), listOf(0), ListSerializer(String.serializer()))
+
+        // A new process: memory is empty, and time since boot started again.
+        now = 5_000
+        wall += 10 * 60_000
+        val next = ScreenCache({ now }, dir = dir, wallClock = { wall })
+        assertNull(next.get("library"))
+        val e = next.restore("library", ListSerializer(String.serializer()))!!
+        assertEquals(listOf("a", "b"), e.value)
+        assertTrue(next.isFresh(e, listOf(0), 30 * 60_000)) // ten minutes old
+        assertFalse(next.isFresh(e, listOf(0), 5 * 60_000))
+        assertFalse(next.isFresh(e, listOf(1), 30 * 60_000))
+        assertEquals(e, next.get("library"))
+
+        next.clearDisk()
+        assertNull(ScreenCache({ now }, dir = dir, wallClock = { wall }).restore("library", ListSerializer(String.serializer())))
+    }
+
+    @Test fun unreadableSavedEntryIsIgnored() {
+        val dir = tmp.newFolder("screens")
+        dir.resolve("library.json").writeText("{nope")
+        assertNull(ScreenCache({ now }, dir = dir).restore("library", ListSerializer(String.serializer())))
     }
 }

@@ -59,6 +59,7 @@ import app.remastered.Diagnostics
 import app.remastered.RemasteredApp
 import app.remastered.core.AppSettings
 import app.remastered.core.Connection
+import app.remastered.core.waitText
 import app.remastered.core.model.best
 import app.remastered.core.warehouse.WarehouseException
 import app.remastered.core.warehouse.WarehouseState
@@ -81,6 +82,8 @@ import app.remastered.ui.theme.Type
 import app.remastered.warehouse.WarehouseConfig
 import app.remastered.warehouse.WarehouseSignIn
 import coil3.SingletonImageLoader
+import java.text.DateFormat
+import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -151,7 +154,10 @@ private fun AccountCard(app: AppState) {
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (me != null) Chip("Open in Spotify", false, { app.viewUri("spotify:user:${me.id}") })
                 else Chip("Retry", false, { app.reloadProfile() })
-                Chip("Sign out", false, { app.c.screens.clear(); app.c.liked.clear(); app.c.spotify.signOut() })
+                Chip("Sign out", false, {
+                    app.c.screens.clear(); app.c.liked.clear(); app.c.spotify.signOut()
+                    app.c.scope.launch { app.c.tiles.clear(); withContext(Dispatchers.IO) { app.c.screens.clearDisk() } }
+                })
             }
         }
     }
@@ -198,7 +204,8 @@ private fun LibraryGroup(app: AppState) {
     val recent by c.recentSearches.entries.collectAsState()
     Group("Library") {
         Toggle("Load Liked Songs at start", "Powers the ♥ marks in lists and \"In your library\" on artist pages. " +
-            "Saved on this phone, so a start only fetches what's new. Off: they load when you open Liked Songs or an artist.", c.settings.preloadLiked)
+            "Saved on this phone, so a start only fetches what's new. The first time, the whole list loads when you open an artist " +
+            "or search Liked Songs. Off: nothing loads until you open Liked Songs or an artist.", c.settings.preloadLiked)
         Item("Liked Songs index", "%,d songs%s".format(liked.size, if (complete) "" else " (not fully loaded)")) {
             Chip("Reload", false, { c.liked.reload() })
         }
@@ -404,8 +411,13 @@ private fun SessionGroup(app: AppState) {
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis(); delay(1_000) } }
     val session = remember(version, now / 5_000) { c.spotify.auth.session() }
     var probe by remember { mutableStateOf<String?>(null) }
+    val pausedUntil by c.spotify.gate.pausedUntil.collectAsState()
     Group("Web API session") {
         Diagnostics.session(session, now).forEach { Item(it.label, it.value, mono = it.label == "Missing") }
+        // Spotify's Retry-After: nothing goes to the Web API until then (App Remote still works).
+        Item("Requests paused", pausedUntil?.takeIf { it > now }?.let {
+            "Until ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it))} (${waitText(it - now)})"
+        } ?: "No")
         FlowRow(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Chip("Refresh token now", false, {

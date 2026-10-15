@@ -97,7 +97,7 @@ fun ArtistScreen(app: AppState, id: String) {
     Box(Modifier.fillMaxSize()) {
         when (val s = data.state) {
             Load.Loading -> Loading(Modifier.padding(top = 120.dp))
-            is Load.Failed -> ErrorMessage(s.message, data.retry, Modifier.padding(top = 120.dp))
+            is Load.Failed -> ErrorMessage(s, data.retry, Modifier.padding(top = 120.dp))
             is Load.Done -> ArtistBody(app, s.value, list)
         }
         TopBar(app, title = data.value?.artist?.name, solid = scrolled)

@@ -30,6 +30,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
+import app.remastered.ui.Load
+import app.remastered.core.waitText
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -258,12 +265,29 @@ fun Loading(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ErrorMessage(message: String, onRetry: (() -> Unit)?, modifier: Modifier = Modifier) {
+fun ErrorMessage(message: String, onRetry: (() -> Unit)?, modifier: Modifier = Modifier, retryAt: Long? = null) {
+    // Until [retryAt] (a rate limit), count down instead of offering a retry that can't work.
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    if (retryAt != null) LaunchedEffect(retryAt) {
+        while (now < retryAt) {
+            delay(1_000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val wait = retryAt?.let { it - now }?.takeIf { it > 0 }
     Column(modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(message, style = Type.bodyRegular, color = Palette.sub)
-        if (onRetry != null) Chip("Try again", selected = true, onClick = onRetry, modifier = Modifier.padding(top = 16.dp))
+        when {
+            wait != null -> Text("Try again in ${waitText(wait)}", style = Type.label, color = Palette.sub, modifier = Modifier.padding(top = 16.dp))
+            onRetry != null -> Chip("Try again", selected = true, onClick = onRetry, modifier = Modifier.padding(top = 16.dp))
+        }
     }
 }
+
+/** [ErrorMessage] for a screen's failed load. */
+@Composable
+fun ErrorMessage(failed: Load.Failed, onRetry: (() -> Unit)?, modifier: Modifier = Modifier) =
+    ErrorMessage(failed.message, onRetry, modifier, failed.retryAt)
 
 @Composable
 fun EmptyMessage(title: String, body: String, modifier: Modifier = Modifier) {

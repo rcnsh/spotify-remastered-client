@@ -68,7 +68,7 @@ fun PlaylistScreen(app: AppState, id: String) {
     Box(Modifier.fillMaxSize()) {
         when (val s = data.state) {
             Load.Loading -> Loading(Modifier.padding(top = 120.dp))
-            is Load.Failed -> ErrorMessage(s.message, data.retry, Modifier.padding(top = 120.dp))
+            is Load.Failed -> ErrorMessage(s, data.retry, Modifier.padding(top = 120.dp))
             is Load.Done -> PlaylistBody(app, s.value, list)
         }
         TopBar(app, onMore = null, title = data.value?.playlist?.name, solid = scrolled)

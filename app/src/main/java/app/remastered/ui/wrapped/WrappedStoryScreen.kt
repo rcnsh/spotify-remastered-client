@@ -103,7 +103,7 @@ fun WrappedStory(c: AppContainer, from: LocalDate, to: LocalDate, onClose: () ->
         when (val s = story.state) {
             Load.Loading -> StoryLoading(from, to, progress, onClose = onClose)
             is Load.Failed -> Column(Modifier.align(Alignment.Center)) {
-                ErrorMessage(s.message, story.retry)
+                ErrorMessage(s, story.retry)
                 StoryLink("Close", onClose)
             }
             is Load.Done -> {

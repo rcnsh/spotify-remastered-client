@@ -9,6 +9,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -23,6 +24,11 @@ import kotlinx.coroutines.withContext
  * what was saved and add up to Spotify's total, or (a song unliked elsewhere, say) it loads
  * everything again, 50 per request. Loading everything on every start got the app rate limited
  * for hours.
+ *
+ * Loading everything is on demand too: a first run (nothing saved) fetches pages only while
+ * something [want]s more of them (Liked Songs as you scroll), or all of them for [load] (an
+ * artist page, finding a song, Settings). 3,000 songs are 60 requests against a quota Spotify
+ * shares between all of the user's apps, so a start alone doesn't spend them.
  */
 class LikedIndex(
     private val catalog: Catalog,
@@ -53,15 +59,27 @@ class LikedIndex(
     val complete: StateFlow<Boolean> = _complete.asStateFlow()
     private var job: Job? = null
     private var restored = false
+    /** How many songs something on screen needs; loading pauses once it has that many. */
+    private val wanted = MutableStateFlow(0)
 
-    /** Starts loading unless already loading or loaded. */
-    fun load() = start(fromSaved = true)
+    /** Loads every liked song unless already loading or loaded. */
+    fun load() = want(Int.MAX_VALUE)
+
+    /**
+     * Loads at least [count] songs: the saved list and the songs liked since (one request,
+     * usually), or on a first run, pages until there are [count]. Raising it resumes loading.
+     */
+    fun want(count: Int) {
+        wanted.update { maxOf(it, count) }
+        start(fromSaved = true)
+    }
 
     /** Drops what's loaded (and saved) and loads everything again. */
     fun reload() {
         job?.cancel()
         _complete.value = false
         publish(emptyList())
+        wanted.value = Int.MAX_VALUE
         start(fromSaved = false)
     }
 
@@ -69,6 +87,7 @@ class LikedIndex(
     fun clear() {
         job?.cancel()
         _complete.value = false
+        wanted.value = 0
         restored = true
         publish(emptyList())
         scope.launch { withContext(io) { runCatching { store.clear() } } }
@@ -121,11 +140,15 @@ class LikedIndex(
         return null
     }
 
-    /** Every liked song, 50 per request; shown as it arrives when [progressive]. */
+    /**
+     * Every liked song, 50 per request; shown as it arrives when [progressive]. Between pages it
+     * waits until [wanted] asks for more than it has.
+     */
     private suspend fun loadAll(progressive: Boolean): List<Track> {
         val all = mutableListOf<Track>()
         var offset = 0
         while (all.size < maxTracks) {
+            if (all.isNotEmpty()) wanted.first { it > all.size }
             val page = catalog.likedTracks(offset, PAGE)
             all += page.items
             if (progressive) publish(all.toList())

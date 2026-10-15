@@ -27,7 +27,7 @@ class AppSettings(private val prefs: SharedPreferences) {
      * which also keeps the App Remote connection alive with no window open.
      */
     val mediaNotification = Flag("media_notification", true)
-    /** Load all Liked Songs in the background at start (for ♥ marks and the artist page). */
+    /** Restore Liked Songs and catch up with new likes at start (for ♥ marks and the artist page). */
     val preloadLiked = Flag("preload_liked", true)
 
     inner class Number internal constructor(private val key: String, private val default: Int) {

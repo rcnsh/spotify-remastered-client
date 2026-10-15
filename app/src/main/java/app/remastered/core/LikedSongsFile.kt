@@ -9,12 +9,16 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * [LikedIndex.Store] as one JSON file (in the cache directory: Android may clear it, and then
- * the next start loads everything again). Decodes leniently; a file it can't read counts as
- * nothing saved.
+ * [LikedIndex.Store] as one JSON file. Decodes leniently; a file it can't read counts as nothing
+ * saved. A [legacy] file (where earlier versions kept it, in the cache) is moved to [file].
  */
-class LikedSongsFile(private val file: File) : LikedIndex.Store {
+class LikedSongsFile(private val file: File, private val legacy: File? = null) : LikedIndex.Store {
     override fun load(): List<Track>? {
+        val old = legacy
+        if (!file.exists() && old != null && old.exists()) {
+            file.parentFile?.mkdirs()
+            if (!old.renameTo(file)) runCatching { old.copyTo(file, overwrite = true); old.delete() }
+        }
         if (!file.exists()) return null
         return runCatching { json.decodeFromString<Saved>(file.readText()) }.getOrNull()
             ?.takeIf { it.version == VERSION }?.tracks?.map { it.toModel() }
@@ -28,7 +32,10 @@ class LikedSongsFile(private val file: File) : LikedIndex.Store {
         if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
     }
 
-    override fun clear() { file.delete() }
+    override fun clear() {
+        file.delete()
+        legacy?.delete()
+    }
 
     @Serializable private class Saved(val version: Int = 0, val tracks: List<SavedTrack> = emptyList())
 
