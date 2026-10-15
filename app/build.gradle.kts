@@ -68,6 +68,14 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+        // Release code (R8, not debuggable) signed with the debug key, so it installs over the
+        // debug build on the phone without an uninstall: for judging performance, which debug
+        // builds of Compose understate badly. `./gradlew :app:installProfile`.
+        create("profile") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+        }
     }
 
     testOptions {

@@ -25,17 +25,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -44,16 +44,19 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onVisibilityChanged
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.remastered.core.PlaybackState
@@ -74,15 +77,27 @@ import app.remastered.ui.lyrics.LyricsPeek
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
-/** The playback position, advancing every frame while playing (no polling of Spotify). */
+/**
+ * The playback position, advancing while playing (no polling of Spotify): every frame, or every
+ * [stepMs] when that's all the reader can show. Read it in draw or layout where possible, so a
+ * change redraws without recomposing.
+ */
 @Composable
-fun rememberPosition(state: PlaybackState?, clock: () -> Long): State<Long> = produceState(state?.positionAt(clock()) ?: 0L, state) {
+fun rememberPosition(state: PlaybackState?, clock: () -> Long, stepMs: Long = 0): State<Long> = produceState(state?.positionAt(clock()) ?: 0L, state, stepMs) {
     value = state?.positionAt(clock()) ?: 0L
     if (state == null || state.isPaused) return@produceState
-    while (true) withFrameMillis { value = state.positionAt(clock()) }
+    if (stepMs <= 0) while (true) withFrameMillis { value = state.positionAt(clock()) }
+    else while (true) {
+        delay(stepMs - value % stepMs)
+        value = state.positionAt(clock())
+    }
 }
+
+/** A step that moves a full-width progress bar about a pixel at a time: 0.1% of the track. */
+private fun progressStep(durationMs: Long) = (durationMs / 1000).coerceIn(50, 1000)
 
 fun formatTime(ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0)
@@ -93,7 +108,7 @@ fun formatTime(ms: Long): String {
 fun MiniPlayer(app: AppState, modifier: Modifier = Modifier) {
     val s by app.c.player.state.collectAsState()
     val track = s?.track ?: return
-    val position by rememberPosition(s, app.c.clock)
+    val position = rememberPosition(s, app.c.clock, progressStep(track.durationMs))
     val tint = rememberArtworkTint(track.imageUrl)
     val bg by animateColorAsState(lerp(Palette.raised, tint, .16f), tween(600), label = "mini")
     Box(
@@ -119,12 +134,13 @@ fun MiniPlayer(app: AppState, modifier: Modifier = Modifier) {
     }
 }
 
+/** Drawn from [position] at draw time, so it moves without recomposing the mini player. */
 @Composable
-private fun ProgressLine(position: Long, duration: Long, modifier: Modifier) {
-    val f = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    Box(modifier.fillMaxWidth().height(2.5.dp).clip(CircleShape).background(Palette.track)) {
-        Box(Modifier.fillMaxWidth(f).height(2.5.dp).clip(CircleShape).background(Palette.progress))
-    }
+private fun ProgressLine(position: State<Long>, duration: Long, modifier: Modifier) {
+    Box(modifier.fillMaxWidth().height(2.5.dp).clip(CircleShape).background(Palette.track).drawBehind {
+        val f = if (duration > 0) (position.value.toFloat() / duration).coerceIn(0f, 1f) else 0f
+        drawRoundRect(Palette.progress, size = size.copy(width = size.width * f), cornerRadius = CornerRadius(size.height / 2))
+    })
 }
 
 @Composable
@@ -151,16 +167,19 @@ fun BottomBar(app: AppState, modifier: Modifier = Modifier) {
     }
 }
 
-/** Draggable seek bar: moves instantly under the finger, seeks once on release. */
+/**
+ * Draggable seek bar: moves instantly under the finger, seeks once on release. The bar and knob
+ * follow [position] in draw and layout; only the time text recomposes, once a second.
+ */
 @Composable
-fun SeekBar(position: Long, duration: Long, enabled: Boolean, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
+fun SeekBar(position: State<Long>, duration: Long, enabled: Boolean, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
     var dragging by remember { mutableStateOf<Float?>(null) }
-    val fraction = dragging ?: if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    var widthPx by remember { mutableFloatStateOf(1f) }
+    val fraction = { dragging ?: if (duration > 0) (position.value.toFloat() / duration).coerceIn(0f, 1f) else 0f }
+    val seconds by remember(duration, position) { derivedStateOf { (dragging?.let { (it * duration).toLong() } ?: position.value) / 1000 } }
     Column(modifier) {
         BoxWithConstraints(
             Modifier.fillMaxWidth().height(28.dp)
-                .semantics { contentDescription = "Seek"; stateDescription = "${formatTime(position)} of ${formatTime(duration)}" }
+                .semantics { contentDescription = "Seek"; stateDescription = "${formatTime(seconds * 1000)} of ${formatTime(duration)}" }
                 .pointerInput(enabled, duration) {
                     if (!enabled) return@pointerInput
                     detectTapGestures { o -> onSeek((o.x / size.width * duration).toLong()) }
@@ -175,16 +194,16 @@ fun SeekBar(position: Long, duration: Long, enabled: Boolean, onSeek: (Long) -> 
                 },
             contentAlignment = Alignment.CenterStart,
         ) {
-            widthPx = with(LocalDensity.current) { maxWidth.toPx() }
             val knob = if (dragging != null) 19.dp else 15.dp
-            Box(Modifier.fillMaxWidth().height(5.dp).clip(CircleShape).background(Palette.track)) {
-                Box(Modifier.fillMaxWidth(fraction).height(5.dp).clip(CircleShape).background(Palette.progress))
-            }
-            Box(Modifier.offset(x = maxWidth * fraction - knob / 2).size(knob).shadow(4.dp, CircleShape).background(Color.White, CircleShape))
+            Box(Modifier.fillMaxWidth().height(5.dp).clip(CircleShape).background(Palette.track).drawBehind {
+                drawRoundRect(Palette.progress, size = size.copy(width = size.width * fraction()), cornerRadius = CornerRadius(size.height / 2))
+            })
+            val widthPx = constraints.maxWidth
+            Box(Modifier.offset { IntOffset((widthPx * fraction() - (knob / 2).toPx()).roundToInt(), 0) }
+                .size(knob).shadow(4.dp, CircleShape).background(Color.White, CircleShape))
         }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-            val shown = dragging?.let { (it * duration).toLong() } ?: position
-            Text(formatTime(shown), style = Type.label.copy(fontSize = 12.sp), color = Color.White.copy(alpha = .65f))
+            Text(formatTime(seconds * 1000), style = Type.label.copy(fontSize = 12.sp), color = Color.White.copy(alpha = .65f))
             Spacer(Modifier.weight(1f))
             Text(formatTime(duration), style = Type.label.copy(fontSize = 12.sp), color = Color.White.copy(alpha = .65f))
         }
@@ -199,8 +218,12 @@ fun NowPlaying(app: AppState, modifier: Modifier = Modifier) {
     val tint = rememberArtworkTint(track?.imageUrl)
     val top by animateColorAsState(lerp(tint, Color.Black, .38f), tween(700), label = "npTop")
     val mid by animateColorAsState(lerp(tint, Palette.base, .72f), tween(700), label = "npMid")
-    val positionState = rememberPosition(state, app.c.clock)
-    val position by positionState
+    val lyricsOn by app.c.settings.lyrics.value.collectAsState()
+    val showLyrics = lyricsOn && track != null
+    // Never read here: a per-frame read would recompose the whole screen every frame. The lyrics
+    // card needs every frame while it's on screen; otherwise the seek bar only needs a pixel's worth.
+    var lyricsVisible by remember { mutableStateOf(false) }
+    val position = rememberPosition(state, app.c.clock, if (showLyrics && lyricsVisible) 0 else progressStep(track?.durationMs ?: 0))
 
     var queue by remember { mutableStateOf<Queue?>(null) }
     LaunchedEffect(track?.uri) {
@@ -208,8 +231,6 @@ fun NowPlaying(app: AppState, modifier: Modifier = Modifier) {
         queue = runCatching { app.c.catalog.queue() }.getOrNull()
     }
 
-    val lyricsOn by app.c.settings.lyrics.value.collectAsState()
-    val showLyrics = lyricsOn && track != null
     // The player fills the screen; the lyrics card peeks below it and scrolls into view.
     BoxWithConstraints(
         modifier.fillMaxSize()
@@ -278,7 +299,7 @@ fun NowPlaying(app: AppState, modifier: Modifier = Modifier) {
                 }
             }
             if (showLyrics) UpNextCard(app, queue, tint, Modifier.padding(horizontal = 12.dp))
-            if (showLyrics) LyricsCard(app, positionState, tint, Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 24.dp))
+            if (showLyrics) LyricsCard(app, position, tint, Modifier.onVisibilityChanged { lyricsVisible = it }.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 24.dp))
         }
     }
 }

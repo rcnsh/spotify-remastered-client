@@ -28,6 +28,11 @@ Where the client is. Tick tasks here in the same change that finishes them.
   swiped from recents; Spotify keeps playing with its own notification channel off).
 - **Rate limits**: Liked Songs saved on the phone (a start fetches only new likes), and a
   429 blocks its endpoint until `Retry-After` passes, across restarts. Verified on the phone.
+- **Performance**: the mini player and seek bar draw progress without recomposing (the bar
+  moves in steps of 1/1000 of the song, at most a second apart), and the lyrics card runs per
+  frame only while it's on screen. Measured on the phone (profile build, 5 s idle at 120 Hz):
+  Home 375 → 17 frames, Now Playing 600 → 116; scrolling Home, Library and Liked Songs 0–0.3%
+  jank. Measure with `installProfile` (debug builds are several times slower).
 
 ## Open
 - [x] Playlist reorder: long-press a song in a playlist you can edit (own order, no filter)

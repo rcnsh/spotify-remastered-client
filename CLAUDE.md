@@ -78,6 +78,8 @@ Related repos in `~/dev`:
 scripts/fetch-spotify-sdk.sh
 ./gradlew :app:testDebugUnitTest :app:installDebug
 ./gradlew :app:assembleRelease            # minified; unsigned
+./gradlew :app:installProfile             # release code, debug key: installs over debug; use for perf
+adb shell dumpsys gfxinfo app.remastered reset   # then ... gfxinfo app.remastered: frame stats
 
 # Debug previews (no sign-in needed, work on the emulator)
 adb shell am start -S -n app.remastered/.MainActivity --es lyrics_preview spotify:track:<id>
