@@ -292,7 +292,8 @@ class WebCatalog(
         return b.build()
     }
 
-    private fun csv(values: List<String>) = values.joinToString(",") { URLEncoder.encode(it, Charsets.UTF_8) }
+    // The String charset name: URLEncoder.encode(String, Charset) is API 33, and minSdk is 29.
+    private fun csv(values: List<String>) = values.joinToString(",") { URLEncoder.encode(it, "UTF-8") }
 
     private fun jsonBody(build: JsonObjectBuilder.() -> Unit): RequestBody =
         buildJsonObject(build).toString().toRequestBody(JSON_TYPE)
