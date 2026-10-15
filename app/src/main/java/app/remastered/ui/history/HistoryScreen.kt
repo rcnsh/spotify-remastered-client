@@ -91,21 +91,35 @@ fun HistoryScreen(app: AppState, day: LocalDate? = null) {
     val playing = app.playingUri()
     val liked by app.c.liked.uris.collectAsState()
 
-    /** Starts over from [from]. With [keep], a failure leaves the current list (pull to refresh). */
+    /**
+     * Starts over from [from]. With [keep], a failure leaves the current list (pull to refresh).
+     * A reload overtaken by a jump to another day (a pull to refresh still running, say) is dropped.
+     */
     suspend fun reload(from: LocalDate?, keep: Boolean) = coroutineScope {
         val p = PlayPager(from?.let { endOfDayMs(it, zone) }, PAGE) { before, limit -> api.playsPage(limit, before) }
-        val latest = if (from == null) async { runCatching { app.c.catalog.recentlyPlayed(50).map { it.toPlay() } }.getOrDefault(emptyList()) } else null
+        val latest = if (from == null) async {
+            try {
+                app.c.catalog.recentlyPlayed(50).map { it.toPlay() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                emptyList()
+            }
+        } else null
         try {
             p.loadMore()
+            val fresh = latest?.await().orEmpty()
+            if (from != anchor) return@coroutineScope
             pager = p
             stored = p.plays
             done = p.done
             error = null
-            recent = latest?.await().orEmpty()
+            recent = fresh
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             latest?.cancel()
+            if (from != anchor) return@coroutineScope
             if (keep && stored.isNotEmpty()) app.message(AppState.describe(e))
             else { pager = null; stored = emptyList(); recent = emptyList(); error = AppState.describe(e) }
         }

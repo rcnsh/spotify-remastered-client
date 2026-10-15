@@ -58,6 +58,7 @@ import app.remastered.ui.load
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -103,17 +104,29 @@ internal fun <T> arrangeHome(rows: HomeRows<T>, uri: (T) -> String, shortcuts: I
     return HomeRows(rows.shortcuts.fresh(shortcuts), rows.jumpBackIn.fresh(cards), rows.aroundNow.fresh(cards), rows.rediscover.fresh(cards))
 }
 
+/**
+ * [block]'s result, or null if it fails: Home's optional parts degrade alone. Unlike runCatching,
+ * cancellation (leaving Home) still cancels.
+ */
+private inline fun <T> orNull(block: () -> T): T? = try {
+    block()
+} catch (e: CancellationException) {
+    throw e
+} catch (_: Exception) {
+    null
+}
+
 /** A context's tile from the Web API, or null when the API won't return it (Spotify-owned playlists). */
 private suspend fun lookup(c: Catalog, uri: String, type: String): HomeItem? {
     val id = uri.substringAfterLast(':')
-    return runCatching {
+    return orNull {
         when (type) {
             "playlist" -> c.playlist(id).let { HomeItem(it.uri, it.name, "Playlist  ·  ${it.owner.displayName}", it.images.best()?.url, false) }
             "album" -> c.album(id).album.let { a -> HomeItem(a.uri, a.name, "Album  ·  ${a.artists.joinToString { it.name }}", a.images.best()?.url, false) }
             "artist" -> c.artist(id).let { HomeItem(it.uri, it.name, "Artist", it.images.best()?.url, true) }
             else -> null
         }
-    }.getOrNull()
+    }
 }
 
 /**
@@ -137,11 +150,11 @@ private suspend fun fromPlays(c: Catalog, plays: List<PlayHistory>, limit: Int):
 private suspend fun loadHome(app: AppState): HomeData = coroutineScope {
     val c = app.c.catalog
     val recent = async { c.recentlyPlayed(50) }
-    val artists = async { runCatching { c.topArtists(TimeRange.Short, 12) }.getOrDefault(emptyList()) }
-    val tracks = async { runCatching { c.topTracks(TimeRange.Short, 8) }.getOrDefault(emptyList()) }
+    val artists = async { orNull { c.topArtists(TimeRange.Short, 12) }.orEmpty() }
+    val tracks = async { orNull { c.topTracks(TimeRange.Short, 8) }.orEmpty() }
     val feed = async {
         if (!app.c.warehouse.supports(WarehouseFeature.Home)) null
-        else runCatching { app.c.warehouse.api.home() }.getOrNull()
+        else orNull { app.c.warehouse.api.home() }
     }
     val rows = feed.await()?.let { fromFeed(c, it, recent.await()) } ?: fromRecent(app, recent.await())
     HomeData(
@@ -195,8 +208,7 @@ private suspend fun fromRecent(app: AppState, plays: List<PlayHistory>): HomeRow
     val c = app.c.catalog
     val older = async {
         if (!app.c.warehouse.state.value.isUsable) emptyList()
-        else runCatching { recentContexts(HOME_CONTEXTS) { before, limit -> app.c.warehouse.api.playsPage(limit, before) } }
-            .getOrDefault(emptyList())
+        else orNull { recentContexts(HOME_CONTEXTS) { before, limit -> app.c.warehouse.api.playsPage(limit, before) } }.orEmpty()
     }
     val recentItems = async { fromPlays(c, plays, HOME_CONTEXTS) }
     val known = plays.mapNotNull { it.context?.uri }.toSet()
