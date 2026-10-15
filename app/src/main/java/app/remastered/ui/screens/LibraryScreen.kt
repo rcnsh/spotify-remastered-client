@@ -61,8 +61,8 @@ import app.remastered.ui.theme.Type
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
-private enum class LibKind { Playlist, Album, Artist }
-private enum class LibFilter(val label: String) { Playlists("Playlists"), ByYou("By you"), Albums("Albums"), Artists("Artists") }
+private enum class LibKind { Playlist, Album, Artist, Show }
+private enum class LibFilter(val label: String) { Playlists("Playlists"), ByYou("By you"), Albums("Albums"), Artists("Artists"), Podcasts("Podcasts") }
 private enum class LibSort(val label: String) { Recents("Recents"), Alphabetical("Alphabetical"), Creator("Creator") }
 
 private data class LibItem(
@@ -71,8 +71,8 @@ private data class LibItem(
 )
 
 /**
- * Your Library: playlists, saved albums and followed artists. Folders and pins aren't in the
- * Web API, so only Liked Songs is pinned.
+ * Your Library: playlists, saved albums, followed artists and saved podcasts. Folders and pins
+ * aren't in the Web API, so only Liked Songs is pinned.
  */
 @Composable
 fun LibraryScreen(app: AppState) {
@@ -82,6 +82,8 @@ fun LibraryScreen(app: AppState) {
             val playlists = async { allPages(1_000) { c.myPlaylists(it, 50) } }
             val albums = async { runCatching { allPages(1_000) { c.savedAlbums(it, 50) } }.getOrDefault(emptyList()) }
             val artists = async { runCatching { c.followedArtists(50) }.getOrDefault(emptyList()) }
+            // Hidden, like albums and artists, if Spotify stops sharing saved shows.
+            val shows = async { runCatching { allPages(1_000) { c.savedShows(it, 50) } }.getOrDefault(emptyList()) }
             playlists.await().map {
                 val mine = it.owner.id == app.me?.id
                 LibItem(it.uri, it.name, dotted("Playlist", it.owner.displayName), it.owner.displayName, it.images.best(160)?.url, LibKind.Playlist, mine)
@@ -90,6 +92,8 @@ fun LibraryScreen(app: AppState) {
                 LibItem(a.uri, a.name, dotted("Album", by), by, a.images.best(160)?.url, LibKind.Album, false)
             } + artists.await().map {
                 LibItem(it.uri, it.name, "Artist", it.name, it.images.best(160)?.url, LibKind.Artist, false)
+            } + shows.await().map {
+                LibItem(it.uri, it.name, "Podcast", it.name, it.images.best(160)?.url, LibKind.Show, false)
             }
         }
     }
@@ -115,6 +119,7 @@ fun LibraryScreen(app: AppState) {
                 LibFilter.ByYou -> item.byYou
                 LibFilter.Albums -> item.kind == LibKind.Album
                 LibFilter.Artists -> item.kind == LibKind.Artist
+                LibFilter.Podcasts -> item.kind == LibKind.Show
             } && (query.isBlank() || item.title.contains(query.trim(), ignoreCase = true) || item.creator.contains(query.trim(), ignoreCase = true))
         }
         when (sort) {
@@ -123,6 +128,7 @@ fun LibraryScreen(app: AppState) {
             LibSort.Creator -> all.sortedBy { it.creator.lowercase() }
         }
     }
+    val hasShows = data.value.orEmpty().any { it.kind == LibKind.Show }
     val showLiked = (filter == null || filter == LibFilter.Playlists) && query.isBlank()
 
     LazyVerticalGrid(
@@ -141,7 +147,8 @@ fun LibraryScreen(app: AppState) {
                 if (finding) FilterField(query, { query = it }, "Find in Your Library", Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp))
                 LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 14.dp)) {
                     if (filter != null) item { Chip("", selected = false, icon = Icons.Close, onClick = { filter = null }) }
-                    items(LibFilter.entries.filter { filter == null || it == filter }) { f ->
+                    // Podcasts only once there's one to show.
+                    items(LibFilter.entries.filter { (filter == null || it == filter) && (it != LibFilter.Podcasts || hasShows) }) { f ->
                         Chip(f.label, selected = f == filter, onClick = { filter = if (filter == f) null else f })
                     }
                 }
@@ -184,7 +191,7 @@ fun LibraryScreen(app: AppState) {
                 }
                 if (shown.isEmpty() && !showLiked) item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyMessage(if (query.isBlank()) "Nothing here yet" else "No matches",
-                        if (query.isBlank()) "Save albums, follow artists and playlists, and they'll show up here." else "Nothing in Your Library matches \"$query\".")
+                        if (query.isBlank()) "Save albums and podcasts, follow artists and playlists, and they'll show up here." else "Nothing in Your Library matches \"$query\".")
                 }
             }
         }

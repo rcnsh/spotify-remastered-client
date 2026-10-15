@@ -5,6 +5,7 @@ import app.remastered.core.model.AlbumDetail
 import app.remastered.core.model.AlbumGroup
 import app.remastered.core.model.Artist
 import app.remastered.core.model.Device
+import app.remastered.core.model.Episode
 import app.remastered.core.model.Page
 import app.remastered.core.model.PlayHistory
 import app.remastered.core.model.Playlist
@@ -12,6 +13,7 @@ import app.remastered.core.model.PlaylistItem
 import app.remastered.core.model.Queue
 import app.remastered.core.model.SearchResults
 import app.remastered.core.model.SearchType
+import app.remastered.core.model.Show
 import app.remastered.core.model.TimeRange
 import app.remastered.core.model.Track
 import app.remastered.core.model.UserRef
@@ -36,6 +38,7 @@ interface Catalog {
     suspend fun savedAlbums(offset: Int = 0, limit: Int = 50): Page<Album>
     suspend fun followedArtists(limit: Int = 50): List<Artist>
     suspend fun likedTracks(offset: Int = 0, limit: Int = 50): Page<Track>
+    suspend fun savedShows(offset: Int = 0, limit: Int = 50): Page<Show>
 
     // Pages
     suspend fun playlist(id: String): Playlist
@@ -45,6 +48,9 @@ interface Catalog {
     suspend fun albumTracks(id: String, offset: Int = 0, limit: Int = 50): Page<Track>
     suspend fun artist(id: String): Artist
     suspend fun artistAlbums(id: String, groups: Set<AlbumGroup>, offset: Int = 0, limit: Int = 10): Page<Album>
+    suspend fun show(id: String): Show
+    /** Newest first. */
+    suspend fun showEpisodes(id: String, offset: Int = 0, limit: Int = 50): Page<Episode>
 
     // Search: Spotify caps Development Mode at 10 results per request.
     suspend fun search(query: String, types: Set<SearchType>, offset: Int = 0, limit: Int = 10): SearchResults
@@ -64,7 +70,17 @@ interface Catalog {
     suspend fun createPlaylist(name: String, description: String = ""): Playlist
     suspend fun addToPlaylist(playlistId: String, uris: List<String>, position: Int? = null): String
     suspend fun removeFromPlaylist(playlistId: String, uris: List<String>, snapshotId: String?): String
+    /** Moves the item at [rangeStart] to before the item now at [insertBefore] (see [PlaylistOrder]). */
     suspend fun reorderPlaylist(playlistId: String, rangeStart: Int, insertBefore: Int, snapshotId: String?): String
+    /** Renames the playlist and sets its description (owner only). */
+    suspend fun updatePlaylistDetails(playlistId: String, name: String, description: String)
+    /** A JPEG of at most [MAX_COVER_BASE64] bytes once base64-encoded; needs the `ugc-image-upload` scope. */
+    suspend fun uploadPlaylistCover(playlistId: String, jpeg: ByteArray)
+
+    companion object {
+        /** Spotify's limit on a playlist cover upload, measured as the base64 body. */
+        const val MAX_COVER_BASE64 = 256 * 1024
+    }
 }
 
 /**

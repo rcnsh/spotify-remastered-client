@@ -70,7 +70,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -101,7 +101,7 @@ fun TrackMenuSheet(app: AppState, menu: TrackMenu) {
             Artwork(t.album?.images?.best(120)?.url, Modifier.size(56.dp), RoundedCornerShape(10.dp))
             Column(Modifier.padding(start = 14.dp)) {
                 TitleText(t.name, Type.body.copy(fontSize = 16.5.sp))
-                SubText(listOfNotNull(t.artistNames, t.album?.name).joinToString("  ·  "), Modifier.padding(top = 3.dp))
+                SubText(listOfNotNull(t.artistNames, t.album?.name).filter { it.isNotBlank() }.joinToString("  ·  "), Modifier.padding(top = 3.dp))
                 if (app.c.settings.showUris.value.collectAsState().value) SubText(t.uri, Modifier.padding(top = 3.dp), color = Palette.dim)
             }
         }
@@ -117,7 +117,11 @@ fun TrackMenuSheet(app: AppState, menu: TrackMenu) {
         if (!t.isEpisode && app.warehouseSupports(WarehouseFeature.TrackHistory)) {
             MenuItem(HistoryIcons.History, "Your plays") { then { app.open(Route.HistoryTrack(t.id)) } }
         }
-        t.album?.let { album -> MenuItem(Icons.Disc, "Go to album") { then { app.open(Route.Album(album.id)) } } }
+        t.album?.let { album ->
+            // An episode's show stands in for its album.
+            if (t.isEpisode) MenuItem(Icons.Podcast, "Go to show") { then { app.open(Route.Show(album.id)) } }
+            else MenuItem(Icons.Disc, "Go to album") { then { app.open(Route.Album(album.id)) } }
+        }
         t.artists.firstOrNull()?.let { artist -> MenuItem(Icons.User, "Go to artist") { then { app.open(Route.Artist(artist.id)) } } }
         MenuItem(Icons.Share, "Share") { then { app.share(t.uri, t.name) } }
     }

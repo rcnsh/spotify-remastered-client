@@ -19,6 +19,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import app.remastered.core.CatalogException
+import app.remastered.core.PlaylistOrder
+import app.remastered.ui.components.rememberReorderState
+import app.remastered.ui.components.reorderItem
+import app.remastered.ui.components.reorderable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -65,6 +75,9 @@ fun PlaylistScreen(app: AppState, id: String) {
     }
 }
 
+/** One row of the playlist; [key] stays put while the row moves, [item] carries its position. */
+private data class Entry(val key: String, val item: PlaylistItem)
+
 @Composable
 private fun PlaylistBody(app: AppState, data: PlaylistData, list: LazyListState) {
     val p = data.playlist
@@ -72,18 +85,59 @@ private fun PlaylistBody(app: AppState, data: PlaylistData, list: LazyListState)
     val liked by app.c.liked.uris.collectAsState()
     var query by rememberSaveable(p.id) { mutableStateOf("") }
     var sort by rememberSaveable(p.id) { mutableStateOf(PlaylistSort.Custom) }
+    var editing by remember { mutableStateOf(false) }
     val own = p.owner.id == app.me?.id
     val followed = app.rememberSaved(p.uri)
     val shuffle = app.shuffleOn()
+    val haptics = LocalHapticFeedback.current
 
-    // Keep each track's position in the playlist: playback starts from that index whatever the sort.
-    val shown = remember(data.items, query, sort) {
-        val indexed = data.items.orEmpty().withIndex().filter { it.value.track.matches(query) }
+    // The playlist as shown, which a drag reorders in place before Spotify hears about it.
+    val entries = remember(data) { data.items.orEmpty().mapIndexed { i, it -> Entry("e$i", it) }.toMutableStateList() }
+    var snapshot by remember(data) { mutableStateOf(p.snapshotId) }
+    val writes = remember(data) { Mutex() }
+    // Long-press drags only in the playlist's own order, unfiltered, and only where it can be changed.
+    val canReorder = p.canEdit(app.me) && sort == PlaylistSort.Custom && query.isBlank() && entries.size > 1
+
+    val reorder = rememberReorderState(
+        list,
+        canMoveTo = { key -> entries.any { it.key == key } },
+        onStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
+        onMove = { from, to ->
+            val i = entries.indexOfFirst { it.key == from }
+            val j = entries.indexOfFirst { it.key == to }
+            if (i >= 0 && j >= 0) entries.add(j, entries.removeAt(i))
+        },
+        onDrop = { key ->
+            val i = entries.indexOfFirst { it.key == key }
+            val from = entries.getOrNull(i)?.item?.position ?: return@rememberReorderState
+            val before = PlaylistOrder.insertBefore(from, entries.getOrNull(i - 1)?.item?.position, entries.getOrNull(i + 1)?.item?.position)
+                ?: return@rememberReorderState
+            // Positions as Spotify will have them, so later moves and playback line up.
+            entries.replaceAll { it.copy(item = it.item.copy(position = PlaylistOrder.shift(it.item.position, from, before))) }
+            val moved = entries.map { it.item }
+            app.launch {
+                writes.withLock {
+                    try {
+                        snapshot = app.c.catalog.reorderPlaylist(p.id, from, before, snapshot)
+                        app.c.screens.update("playlist:${p.id}", PlaylistData(p.copy(snapshotId = snapshot), moved))
+                    } catch (e: CatalogException) {
+                        // Reload to show the order Spotify actually has.
+                        app.playlistsChanged()
+                        throw e
+                    }
+                }
+            }
+        },
+    )
+
+    // Sorting keeps each track's position in the playlist: playback starts from it whatever the order.
+    val shown = remember(entries.toList(), query, sort) {
+        val matching = entries.filter { it.item.track.matches(query) }
         when (sort) {
-            PlaylistSort.Custom -> indexed
-            PlaylistSort.Added -> indexed.sortedByDescending { it.value.addedAtEpochMs ?: 0 }
-            PlaylistSort.Title -> indexed.sortedBy { it.value.track.name.lowercase() }
-            PlaylistSort.Artist -> indexed.sortedBy { it.value.track.artistNames.lowercase() }
+            PlaylistSort.Custom -> matching
+            PlaylistSort.Added -> matching.sortedByDescending { it.item.addedAtEpochMs ?: 0 }
+            PlaylistSort.Title -> matching.sortedBy { it.item.track.name.lowercase() }
+            PlaylistSort.Artist -> matching.sortedBy { it.item.track.artistNames.lowercase() }
         }
     }
     val duration = data.items?.sumOf { it.track.durationMs }
@@ -107,6 +161,8 @@ private fun PlaylistBody(app: AppState, data: PlaylistData, list: LazyListState)
                     IconButton(if (on) Icons.Check else Icons.Plus, if (on) "Remove from Your Library" else "Add to Your Library",
                         { app.setSaved(p.uri, !on) { followed.value = it } }, tint = if (on) Palette.accent else Palette.text, iconSize = 24.dp)
                 }
+                // Spotify lets only the owner change a playlist's details, not collaborators.
+                if (own) IconButton(Icons.Edit, "Edit details", { editing = true }, tint = Palette.text)
                 IconButton(Icons.Share, "Share", { app.share(p.uri, p.name) }, tint = Palette.text)
             }
         }
@@ -125,16 +181,21 @@ private fun PlaylistBody(app: AppState, data: PlaylistData, list: LazyListState)
                 Chip(sort.label, selected = false, icon = Icons.Sort, onClick = { sort = PlaylistSort.entries[(sort.ordinal + 1) % PlaylistSort.entries.size] })
             }
         }
-        itemsIndexed(shown, key = { _, it -> "${it.index}:${it.value.track.id}" }) { _, (index, item) ->
-            val t = item.track
+        itemsIndexed(shown, key = { _, it -> it.key }) { index, entry ->
+            val t = entry.item.track
+            val menu = { app.menu = app.trackMenu(t, p.copy(snapshotId = snapshot).takeIf { it.canEdit(app.me) }) }
             TrackRow(
                 t,
-                onClick = { app.playAt(p.uri, index) },
-                onMore = { app.menu = app.trackMenu(t, p.takeIf { it.canEdit(app.me) }) },
+                onClick = { app.playAt(p.uri, entry.item.position.takeIf { it >= 0 } ?: index) },
+                onMore = menu,
+                modifier = reorderItem(reorder, entry.key).reorderable(reorder, entry.key, canReorder),
                 playing = player?.track?.uri == t.uri && player?.context?.uri == p.uri,
                 liked = t.uri in liked,
+                // While the order can change, a long press picks the row up; the ⋯ button still opens the menu.
+                onLongClick = menu.takeUnless { canReorder },
             )
         }
         if (shown.isEmpty()) item { EmptyMessage("No matches", "Nothing in this playlist matches \"$query\".") }
     }
+    if (editing) EditPlaylistSheet(app, p) { editing = false }
 }

@@ -89,7 +89,7 @@ class SpotifyAuth(
             "user-read-recently-played", "user-top-read", "user-library-read", "user-library-modify",
             "playlist-read-private", "playlist-read-collaborative", "playlist-modify-private",
             "playlist-modify-public", "user-follow-read", "user-follow-modify", "user-read-private",
-            "app-remote-control", "streaming",
+            "app-remote-control", "streaming", "ugc-image-upload",
         )
 
         /** [clientSecret] is optional; blank means PKCE only. */

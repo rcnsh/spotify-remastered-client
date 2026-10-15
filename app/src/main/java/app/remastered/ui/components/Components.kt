@@ -165,10 +165,12 @@ fun TrackRow(
     liked: Boolean = false,
     number: Int? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
+    /** Null leaves the long press free, e.g. for dragging the row ([reorderable]). */
+    onLongClick: (() -> Unit)? = onMore,
 ) {
     Row(
         modifier.fillMaxWidth().height(64.dp)
-            .combinedClickable(onClick = onClick, onLongClick = onMore)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -62,6 +62,12 @@ class SpotifyServices(context: Context, scope: CoroutineScope, clock: () -> Long
         signedIn = false
     }
 
+    /**
+     * Whether the session was granted [scope]. Scopes added since the user signed in (like
+     * `ugc-image-upload` for playlist covers) need a fresh sign-in, so features check this first.
+     */
+    fun hasScope(scope: String): Boolean = auth.session()?.scope?.split(' ')?.contains(scope) == true
+
     /** Re-reads the token store, e.g. after a refresh was rejected and the tokens were cleared. */
     fun recheck() { signedIn = auth.isSignedIn }
 

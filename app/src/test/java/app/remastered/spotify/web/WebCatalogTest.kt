@@ -180,6 +180,8 @@ class WebCatalogTest {
         assertEquals("/v1/playlists/p1/items", req.path)
         assertEquals("track,episode", req.query("additional_types"))
         assertEquals(listOf("t1", "e1"), page.items.map { it.track.id })
+        // Positions count the entries the app drops (the local file), as Spotify does.
+        assertEquals(listOf(0, 3), page.items.map { it.position })
         assertEquals(1704164645000L, page.items[0].addedAtEpochMs)
         assertEquals("a1", page.items[0].track.album!!.id)
         val ep = page.items[1].track
@@ -364,6 +366,76 @@ class WebCatalogTest {
         assertEquals("""{"range_start":0,"insert_before":3,"range_length":1,"snapshot_id":"s3"}""", put.bodyText)
     }
 
+    @Test fun `playlist item positions continue from the page offset`() = runTest {
+        enqueue("""{"offset":50,"total":52,"items":[{"is_local":true,"item":{"name":"local.mp3","is_local":true}},{"item":$TRACK}]}""")
+        assertEquals(listOf(51), catalog.playlistItems("p1", 50).items.map { it.position })
+    }
+
+    @Test fun `playlist description is unescaped`() = runTest {
+        enqueue("""{"id":"p1","name":"Mine","description":"It&#x27;s rock &amp; roll &lt;3 &#128293; &bogus;","owner":{"id":"u1"},"snapshot_id":"s"}""")
+        assertEquals("It's rock & roll <3 🔥 &bogus;", catalog.playlist("p1").description)
+    }
+
+    @Test fun `update playlist details puts name and description`() = runTest {
+        enqueue("")
+        catalog.updatePlaylistDetails("p1", "New name", "It's new")
+        val req = take()
+        assertEquals("PUT", req.method)
+        assertEquals("/v1/playlists/p1", req.path)
+        assertEquals("""{"name":"New name","description":"It's new"}""", req.bodyText)
+    }
+
+    @Test fun `cover upload sends base64 jpeg`() = runTest {
+        enqueue("", 202)
+        catalog.uploadPlaylistCover("p1", byteArrayOf(-1, -40, -1, -32))
+        val req = take()
+        assertEquals("PUT", req.method)
+        assertEquals("/v1/playlists/p1/images", req.path)
+        assertEquals("image/jpeg", req.headers["Content-Type"])
+        assertEquals("/9j/4A==", req.bodyText)
+    }
+
+    @Test fun `cover over the limit is refused without a request`() = runTest {
+        val e = assertThrows { catalog.uploadPlaylistCover("p1", ByteArray(200_000)) }
+        assertEquals("COVER_TOO_LARGE", e.reason)
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test fun `saved shows mapping`() = runTest {
+        enqueue("""{"offset":0,"total":2,"next":"n","items":[{"added_at":"2024-01-02T03:04:05Z","show":$SHOW},{"show":null}]}""")
+        val page = catalog.savedShows()
+        assertEquals("/v1/me/shows", take().path)
+        val show = page.items.single()
+        assertEquals("spotify:show:s1", show.uri)
+        assertEquals("A show about things", show.description)
+        assertEquals(120, show.totalEpisodes)
+        assertTrue(page.hasMore)
+    }
+
+    @Test fun `show episodes get the show as their album`() = runTest {
+        enqueue(SHOW)
+        enqueue("""{"offset":0,"total":120,"next":"n","items":[
+            {"id":"e2","name":"Ep 2","type":"episode","duration_ms":2000,"description":"Second","release_date":"2026-10-01","images":[{"url":"https://i/e2"}]},
+            {"id":"x","type":"track","name":"Not an episode"},
+            null
+        ]}""")
+        enqueue("""{"offset":50,"total":120,"items":[]}""")
+        val page = catalog.showEpisodes("s1")
+        assertEquals("/v1/shows/s1", take().path)
+        assertEquals("/v1/shows/s1/episodes", take().path)
+        val e = page.items.single()
+        assertTrue(e.track.isEpisode)
+        assertEquals("spotify:episode:e2", e.track.uri)
+        assertEquals("s1", e.track.album!!.id)
+        assertEquals("Show", e.track.album.name)
+        assertEquals("Second", e.description)
+        assertEquals("2026-10-01", e.releaseDate)
+        // The show is remembered: the next page doesn't fetch it again.
+        catalog.showEpisodes("s1", 50)
+        assertEquals("/v1/shows/s1/episodes", take().path)
+        assertEquals(3, server.requestCount)
+    }
+
     @Test fun `create playlist posts to me playlists`() = runTest {
         enqueue("""{"id":"p9","name":"New","description":"","owner":{"id":"u1","display_name":"Ada"},"snapshot_id":"s1","collaborative":false,"items":{"total":0}}""", 201)
         val p = catalog.createPlaylist("New")
@@ -426,6 +498,9 @@ class WebCatalogTest {
 
         const val EPISODE = """{"id":"e1","name":"Ep 1","type":"episode","duration_ms":1000,"explicit":false,
             "images":[{"url":"https://i/e1"}],"show":{"id":"s1","name":"Show","images":[{"url":"https://i/s1"}]}}"""
+
+        const val SHOW = """{"id":"s1","name":"Show","description":"A show about things ","total_episodes":120,
+            "images":[{"url":"https://i/s1","width":640,"height":640}]}"""
 
         const val SIMPLE_PLAYLIST = """{"id":"p1","name":"Mix","description":"d","collaborative":false,
             "owner":{"id":"u2","display_name":"Bob"},"snapshot_id":"s","images":null,"tracks":{"href":"h","total":42}}"""
