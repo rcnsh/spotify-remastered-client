@@ -28,6 +28,7 @@ Where the client is. Tick tasks here in the same change that finishes them.
   swiped from recents; Spotify keeps playing with its own notification channel off).
 - **Rate limits**: Liked Songs saved on the phone (a start fetches only new likes), and a
   429 blocks its endpoint until `Retry-After` passes, across restarts. Verified on the phone.
+  Replaced by ADR 0008 (below).
 - **Performance**: the mini player and seek bar draw progress without recomposing (the bar
   moves in steps of 1/1000 of the song, at most a second apart), and the lyrics card runs per
   frame only while it's on screen. Measured on the phone (profile build, 5 s idle at 120 Hz):
@@ -44,6 +45,10 @@ Where the client is. Tick tasks here in the same change that finishes them.
 - [x] Podcasts: saved shows in the Library (Podcasts filter), a show screen with episodes
       (paged as you scroll), "Go to show" in an episode's menu. Verified on the phone
       (playing an episode from the show screen not tried).
+- [ ] Web API gate (ADR 0008): one pause for every request on `Retry-After`, kept across
+      restarts; 3 in flight and 20 per 30 s; Liked Songs paged on demand; Home tiles and
+      Library kept on disk. Unit-tested; not yet verified on the phone (check once Spotify's
+      pause from 2026-10-16 has passed).
 - [ ] App-owned Library folders and pins (ADR 0004).
 - [ ] Spike App Remote `getChildrenOfItem` for track lists of other people's playlists
       (ADR 0004, open question 2).
