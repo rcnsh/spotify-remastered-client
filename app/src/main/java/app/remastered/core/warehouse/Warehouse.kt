@@ -45,7 +45,8 @@ interface Warehouse {
     /** Ranges worth offering, with whether each has been computed (a read token can only open those). */
     suspend fun wrappedRanges(): List<WrappedRange>
     /**
-     * A year-in-review for a closed range ending before today. With a read token, a range nobody
+     * A year-in-review for a closed range ending before today. With a read token, a preset range
+     * from [wrappedRanges] is computed on first open (it can take a while); any other range nobody
      * computed yet fails with [WarehouseException.Problem.Forbidden].
      */
     suspend fun wrapped(from: LocalDate, to: LocalDate): Wrapped

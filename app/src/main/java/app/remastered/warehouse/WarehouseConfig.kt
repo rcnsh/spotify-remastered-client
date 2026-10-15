@@ -5,7 +5,7 @@ import app.remastered.core.KeystoreSealer
 import app.remastered.core.Sealer
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
-/** Where the warehouse is and the bearer token for its `/api` routes (READ_TOKEN or ADMIN_TOKEN). */
+/** Where the warehouse is and the bearer token for its `/api` routes (a read token on this phone). */
 data class WarehouseConfig(val baseUrl: String, val token: String) {
     override fun toString() = "WarehouseConfig(baseUrl=$baseUrl, token=<redacted>)"
 

@@ -16,7 +16,7 @@ Spotify: it drives the installed, unmodified Spotify app.
   [music-warehouse](https://github.com/rcnsh/music-warehouse), a Cloudflare Worker that keeps
   every play: History, Stats and Wrapped. In Settings → Listening history, enter its address,
   then either **Sign in with Spotify** (with the account that owns the warehouse; it mints a
-  read token for this phone, valid 90 days) or paste a READ_TOKEN. The token is stored
+  read token for this phone, valid 90 days) or paste a `read` device token. The token is stored
   encrypted on the phone. Without one, those features stay hidden.
   - History: every play, newest first, by day; jump to a date, pull to refresh. Plays newer
     than the warehouse's last poll come from Spotify's recently-played.
@@ -54,7 +54,7 @@ device.
    # The build refuses a secret key (sl_sk_…). Without a key the app runs without lyrics.
    spicylyrics.key=
    # Optional, debug builds only: start with this music-warehouse already set up (Settings →
-   # Listening history can change or remove it). Use the READ_TOKEN. Release builds never embed these.
+   # Listening history can change or remove it). Use a read token, never the admin one. Release builds never embed these.
    warehouse.url=https://music-api.example.com
    warehouse.readToken=
    ```
