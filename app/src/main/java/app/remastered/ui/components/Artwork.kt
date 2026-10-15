@@ -4,24 +4,24 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette as AndroidPalette
 import app.remastered.spotify.remote.AppRemotePlayer
-import app.remastered.ui.theme.Palette
-import androidx.compose.material3.Icon
-import androidx.compose.ui.Alignment
 import app.remastered.ui.theme.Icons
+import app.remastered.ui.theme.Palette
 import coil3.ImageLoader
 import coil3.asImage
 import coil3.compose.AsyncImage
@@ -34,6 +34,8 @@ import coil3.request.ImageRequest
 import coil3.request.Options
 import coil3.request.allowHardware
 import coil3.toBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Artwork from the Spotify app itself (App Remote), keyed by its image id. */
 data class RemoteImage(val raw: String)
@@ -94,8 +96,11 @@ fun rememberArtworkTint(url: String?, fallback: Color = Palette.selected): Color
         if (url in tintCache) return@LaunchedEffect
         val result = loader.execute(ImageRequest.Builder(context).data(model(url)).size(128).allowHardware(false).build())
         val bmp = result.image?.toBitmap() ?: return@LaunchedEffect
-        val p = AndroidPalette.from(bmp).generate()
-        val swatch = p.vibrantSwatch ?: p.dominantSwatch ?: p.mutedSwatch ?: return@LaunchedEffect
+        // Palette scans every pixel: off the main thread, where it would cost frames mid-scroll.
+        val swatch = withContext(Dispatchers.Default) {
+            val p = AndroidPalette.from(bmp).generate()
+            p.vibrantSwatch ?: p.dominantSwatch ?: p.mutedSwatch
+        } ?: return@LaunchedEffect
         tintCache[url] = Color(swatch.rgb)
     }
     return cached ?: fallback

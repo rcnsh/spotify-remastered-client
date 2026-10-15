@@ -485,7 +485,7 @@ private fun LyricsView(
         if (playback != null && track != null) {
             Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SeekBar(position.value, track.durationMs, playback.canSeek, onSeek, Modifier.weight(1f))
+                SeekBar(position, track.durationMs, playback.canSeek, onSeek, Modifier.weight(1f))
                 Box(Modifier.size(52.dp).clip(CircleShape).background(Color.White).clickable(onClickLabel = if (playback.isPaused) "Play" else "Pause", onClick = onToggle),
                     contentAlignment = Alignment.Center) {
                     Icon(if (playback.isPaused) Icons.Play else Icons.Pause, if (playback.isPaused) "Play" else "Pause", Modifier.size(24.dp), tint = Palette.base)
