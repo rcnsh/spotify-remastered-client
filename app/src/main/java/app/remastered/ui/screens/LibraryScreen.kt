@@ -103,7 +103,7 @@ fun LibraryScreen(app: AppState) {
     var finding by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var creating by remember { mutableStateOf(false) }
-    val likedCount = app.c.liked.tracks.value.size
+    val likedCount = app.c.liked.tracks.collectAsState().value.size
     val warehouse by app.c.warehouse.state.collectAsState()
     // Listening history (music-warehouse), pinned under Liked Songs while it's set up.
     val history = if (warehouse.isUsable) listOf(

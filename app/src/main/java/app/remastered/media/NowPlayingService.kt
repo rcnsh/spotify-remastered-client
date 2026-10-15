@@ -1,5 +1,6 @@
 package app.remastered.media
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -43,6 +44,9 @@ import kotlinx.coroutines.launch
  * App Remote connection) alive with no window open. Paused, it leaves the foreground and the
  * notification can be swiped away, which stops it. [NowPlayingNotification] starts it.
  */
+// NotificationPermission: a MediaStyle notification tied to a media session, as this one is, is
+// exempt from POST_NOTIFICATIONS on Android 13+, so the app doesn't ask for it.
+@SuppressLint("NotificationPermission")
 class NowPlayingService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var session: MediaSession

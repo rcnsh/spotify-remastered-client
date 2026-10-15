@@ -1,5 +1,6 @@
 package app.remastered.spotify.auth
 
+import android.annotation.SuppressLint
 import android.content.Context
 
 /**
@@ -76,6 +77,7 @@ class PrefsTokenStore(context: Context) : TokenStore {
     }
 
     // commit(): the login activity may kill us right after launch; the verifier must be on disk.
+    @SuppressLint("ApplySharedPref")
     override fun savePendingLogin(pending: PendingLogin) {
         prefs.edit().putString(VERIFIER, pending.verifier).putString(STATE, pending.state).commit()
     }
