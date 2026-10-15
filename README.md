@@ -57,8 +57,18 @@ device.
    # Listening history can change or remove it). Use a read token, never the admin one. Release builds never embed these.
    warehouse.url=https://music-api.example.com
    warehouse.readToken=
+   # Optional: sign release builds. Keep the keystore outside the repo. The password comes from
+   # REMASTERED_RELEASE_PASSWORD, or on macOS the Keychain item
+   # spotify-remastered-release / keystore. Without these, release builds are unsigned.
+   release.storeFile=/path/to/release.jks
+   release.keyAlias=remastered
    ```
 3. `./gradlew :app:testDebugUnitTest :app:installDebug`
+
+A signed release build is `./gradlew :app:assembleRelease`, at
+`app/build/outputs/apk/release/app-release.apk`. Spotify checks the signing certificate, so add
+its SHA-1 (`keytool -list -v -keystore <file>`) under Android packages in the Spotify dashboard.
+A build signed with a different key can't install over this one without an uninstall.
 
 Each person who builds this needs their own Spotify developer app and their own Spicy Lyrics key.
 
