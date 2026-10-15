@@ -38,11 +38,18 @@ class RemasteredApp : Application(), SingletonImageLoader.Factory {
         container = AppContainer(this)
     }
 
-    /** Signs out and deletes every setting (warehouse included), recent search, cached lyric and saved Liked Songs, then [restart]s. Clear images separately. */
+    /**
+     * Signs out and deletes every setting (warehouse included), recent search, cached lyric, saved
+     * Liked Songs, Home tile and saved screen, then [restart]s. Clear images separately. Keeps a
+     * pause Spotify asked for (see WebApiGate): resetting doesn't lift Spotify's limit.
+     */
     fun reset() {
         container?.spotify?.signOut()
         container?.lyricsCache?.clear()
         File(cacheDir, AppContainer.LIKED_SONGS).delete()
+        File(filesDir, AppContainer.LIKED_SONGS).delete()
+        File(filesDir, AppContainer.HOME_TILES).delete()
+        File(filesDir, AppContainer.SCREENS).deleteRecursively()
         container?.warehouse?.clear()
         listOf(AppContainer.PREFS_SETTINGS, AppContainer.PREFS_SEARCH).forEach {
             getSharedPreferences(it, Context.MODE_PRIVATE).edit().clear().commit()

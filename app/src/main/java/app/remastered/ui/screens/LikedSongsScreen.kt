@@ -31,7 +31,6 @@ import app.remastered.ui.theme.Palette
 
 @Composable
 fun LikedSongsScreen(app: AppState) {
-    LaunchedEffect(Unit) { app.c.liked.load() }
     val tracks by app.c.liked.tracks.collectAsState()
     val complete by app.c.liked.complete.collectAsState()
     val player by app.c.player.state.collectAsState()
@@ -42,6 +41,12 @@ fun LikedSongsScreen(app: AppState) {
     val collection = app.me?.let { "spotify:user:${it.id}:collection" }
     val list = rememberLazyListState()
     val scrolled by remember { derivedStateOf { list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 700 } }
+    // Songs are fetched as the list nears its end (a page ahead of what's on screen), all of them
+    // only to find one: a first run doesn't spend 60 requests on 3,000 songs nobody scrolls to.
+    val reached by remember { derivedStateOf { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 } }
+    LaunchedEffect(reached, query.isBlank()) {
+        if (query.isBlank()) app.c.liked.want(reached + LIKED_AHEAD) else app.c.liked.load()
+    }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = ScreenPadding) {
@@ -81,3 +86,6 @@ fun LikedSongsScreen(app: AppState) {
         TopBar(app, title = "Liked Songs", solid = scrolled)
     }
 }
+
+/** Songs Liked Songs keeps loaded past the last one on screen. */
+private const val LIKED_AHEAD = 40

@@ -26,7 +26,6 @@ import java.util.Base64
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -51,18 +50,17 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * [Catalog] over the Spotify Web API, restricted to what a Development Mode app may call after
  * the Feb 2026 changes (no batch, browse, recommendations, top-tracks, other users' data).
  *
- * Every call runs on [io]. A 401 triggers one [TokenProvider.refresh] and retry; a 429 is retried
- * up to [MAX_RATE_RETRIES] times honouring `Retry-After`, unless the wait exceeds
- * [MAX_RETRY_AFTER_S]. A 429 that isn't retried goes into [limits], and that endpoint fails
- * without a request until the wait is over. [sleep] is injectable so tests don't wait.
+ * Every call runs on [io], and every HTTP request goes through [gate]: a budget shared by the
+ * whole app, and a pause for all of it when Spotify sends `Retry-After`. A 401 triggers one
+ * [TokenProvider.refresh] and retry. A 429 pauses the gate; the request is tried once more if
+ * the pause is short enough for the gate to wait out, and fails otherwise.
  */
 class WebCatalog(
     private val http: OkHttpClient,
     private val tokens: TokenProvider,
     baseUrl: String = "https://api.spotify.com/v1/",
     private val io: CoroutineDispatcher = Dispatchers.IO,
-    private val sleep: suspend (Long) -> Unit = { delay(it) },
-    private val limits: RateLimits = RateLimits(),
+    private val gate: WebApiGate = WebApiGate(),
 ) : Catalog {
     private val base: HttpUrl = baseUrl.toHttpUrl()
 
@@ -310,43 +308,38 @@ class WebCatalog(
 
     private fun malformed(what: String) = CatalogException("Spotify returned an incomplete $what", null, "MALFORMED_RESPONSE")
 
-    /** Sends with auth, 401-refresh and 429 handling; returns the body text of a 2xx response. */
+    /** Sends with auth, the gate, 401-refresh and 429 handling; returns the body text of a 2xx response. */
     private suspend fun send(url: HttpUrl, method: String, body: RequestBody?): String =
         withContext(io) { sendOnIo(url, method, body) }
 
     private suspend fun sendOnIo(url: HttpUrl, method: String, body: RequestBody?): String {
-        val endpoint = url.encodedPath
-        limits.remainingMs(endpoint)?.let {
-            throw CatalogException("Spotify 429: rate limited", 429, null, retryAfterMs = it)
-        }
-        var token = token { tokens.accessToken() }
+        var token: String? = null
         var refreshed = false
         var rateRetries = 0
         while (true) {
-            val request = Request.Builder().url(url).method(method, body)
-                .header("Authorization", "Bearer $token")
-                .build()
-            val reply = try {
-                http.newCall(request).await().use { Reply(it.code, it.header("Retry-After"), it.body.string()) }
-            } catch (e: IOException) {
-                throw CatalogException("Network error talking to Spotify", null, null, e)
+            val reply = gate.withPermit {
+                // Inside the gate, so a paused gate doesn't refresh the token either.
+                val t = token ?: token { tokens.accessToken() }.also { token = it }
+                val request = Request.Builder().url(url).method(method, body)
+                    .header("Authorization", "Bearer $t")
+                    .build()
+                try {
+                    http.newCall(request).await().use { Reply(it.code, it.header("Retry-After"), it.body.string()) }
+                } catch (e: IOException) {
+                    throw CatalogException("Network error talking to Spotify", null, null, e)
+                }
             }
+            if (reply.code in 200..299) return reply.body
+            // Any Retry-After pauses everything, not just this endpoint: Spotify's quota is per user.
+            val waitS = retryAfterS(reply) ?: if (reply.code == 429) DEFAULT_RETRY_AFTER_S else null
+            waitS?.let { gate.pause(it * 1000) }
             when {
-                reply.code in 200..299 -> return reply.body
                 reply.code == 401 && !refreshed -> {
                     refreshed = true
                     token = token { tokens.refresh() }
                 }
-                reply.code == 429 && rateRetries < MAX_RATE_RETRIES && retryAfterS(reply).let { it == null || it <= MAX_RETRY_AFTER_S } -> {
-                    rateRetries++
-                    sleep((retryAfterS(reply) ?: 1L) * 1000)
-                }
-                reply.code == 429 -> {
-                    val waitS = retryAfterS(reply)
-                    if (waitS != null) limits.limit(endpoint, waitS * 1000)
-                    throw error(reply, waitS?.times(1000))
-                }
-                else -> throw error(reply)
+                reply.code == 429 && rateRetries < MAX_RATE_RETRIES && waitS != null && waitS <= MAX_RETRY_AFTER_S -> rateRetries++
+                else -> throw error(reply, waitS?.let { gate.remainingMs() ?: (it * 1000) })
             }
         }
     }
@@ -389,8 +382,12 @@ class WebCatalog(
     private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 
     internal companion object {
-        const val MAX_RATE_RETRIES = 3
+        /** Retries after a 429, each once the gate's pause has passed. */
+        const val MAX_RATE_RETRIES = 1
+        /** The longest pause a request waits out (the gate's default); longer ones fail at once. */
         const val MAX_RETRY_AFTER_S = 30L
+        /** A 429 without `Retry-After` pauses for this long. */
+        const val DEFAULT_RETRY_AFTER_S = 5L
         const val MAX_CURSOR_PAGES = 20
         const val LIBRARY_CHUNK = 40
         const val PLAYLIST_CHUNK = 100

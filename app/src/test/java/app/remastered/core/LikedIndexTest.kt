@@ -122,6 +122,52 @@ class LikedIndexTest {
         assertTrue(index.tracks.value.isEmpty())
     }
 
+    @Test fun firstRunFetchesOnlyWhatIsWanted() = runTest {
+        val library = FakeLibrary((1..300).map(::track))
+        val store = MemoryStore()
+        val index = index(library, store)
+        index.want(1) // a start
+        advanceUntilIdle()
+        assertEquals(listOf(0), library.offsets)
+        assertEquals(50, index.tracks.value.size)
+        assertFalse(index.complete.value)
+        assertNull(store.saved)
+
+        index.want(120) // scrolling Liked Songs
+        advanceUntilIdle()
+        assertEquals(listOf(0, 50, 100), library.offsets)
+        assertEquals(150, index.tracks.value.size)
+        index.want(60) // scrolled back up: nothing more
+        advanceUntilIdle()
+        assertEquals(3, library.offsets.size)
+
+        index.load() // an artist page: everything, saved once complete
+        advanceUntilIdle()
+        assertEquals(listOf(0, 50, 100, 150, 200, 250), library.offsets)
+        assertTrue(index.complete.value)
+        assertEquals(300, store.saved?.size)
+    }
+
+    @Test fun aStartWithASavedListOnlyCatchesUp() = runTest {
+        val old = (1..300).map(::track)
+        val library = FakeLibrary(listOf(track(400)) + old)
+        val index = index(library, MemoryStore(old))
+        index.want(1)
+        advanceUntilIdle()
+        assertEquals(listOf(0), library.offsets)
+        assertEquals(301, index.tracks.value.size)
+        assertTrue(index.complete.value)
+    }
+
+    @Test fun legacyFileMovesOutOfTheCache() {
+        val legacy = tmp.root.resolve("cache/liked.json")
+        LikedSongsFile(legacy).save(listOf(track(1)))
+        val file = LikedSongsFile(tmp.root.resolve("files/liked.json"), legacy)
+        assertEquals(listOf(track(1)), file.load())
+        assertFalse(legacy.exists())
+        assertTrue(tmp.root.resolve("files/liked.json").exists())
+    }
+
     @Test fun fileRoundTrips() {
         val file = LikedSongsFile(tmp.root.resolve("liked.json"))
         assertNull(file.load())

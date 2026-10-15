@@ -30,7 +30,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.remastered.core.Catalog
+import app.remastered.core.CatalogException
+import app.remastered.core.ContextTiles
 import app.remastered.core.Connection
 import app.remastered.core.model.PlayHistory
 import app.remastered.core.model.TimeRange
@@ -116,30 +117,46 @@ private inline fun <T> orNull(block: () -> T): T? = try {
     null
 }
 
-/** A context's tile from the Web API, or null when the API won't return it (Spotify-owned playlists). */
-private suspend fun lookup(c: Catalog, uri: String, type: String): HomeItem? {
+/**
+ * A context's tile: from [ContextTiles] when looked up lately, else from the Web API. Null when
+ * the API won't return it (Spotify-owned playlists), which is remembered too.
+ */
+private suspend fun lookup(app: AppState, uri: String, type: String): HomeItem? {
+    val tiles = app.c.tiles
+    tiles.get(uri)?.let { return it.tile?.let { t -> HomeItem(uri, t.title, t.subtitle, t.imageUrl, t.round) } }
+    val c = app.c.catalog
     val id = uri.substringAfterLast(':')
-    return orNull {
+    val item = try {
         when (type) {
             "playlist" -> c.playlist(id).let { HomeItem(it.uri, it.name, "Playlist  ·  ${it.owner.displayName}", it.images.best()?.url, false) }
             "album" -> c.album(id).album.let { a -> HomeItem(a.uri, a.name, "Album  ·  ${a.artists.joinToString { it.name }}", a.images.best()?.url, false) }
             "artist" -> c.artist(id).let { HomeItem(it.uri, it.name, "Artist", it.images.best()?.url, true) }
-            else -> null
+            else -> return null
         }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: CatalogException) {
+        // Not found or not allowed won't change by asking again soon; anything else might.
+        if (e.status == 403 || e.status == 404) tiles.put(uri, null)
+        return null
+    } catch (_: Exception) {
+        return null
     }
+    tiles.put(uri, ContextTiles.Tile(item.title, item.subtitle, item.imageUrl, item.round))
+    return item
 }
 
 /**
  * Tiles for [plays], newest first: each play's context, or its track's album when it has none or
- * the API won't return it, so the grid stays full.
+ * the API won't return it, so the grid stays full. An album context is its track's album, which
+ * the play already carries, so only playlists and artists are looked up.
  */
-private suspend fun fromPlays(c: Catalog, plays: List<PlayHistory>, limit: Int): List<HomeItem> = coroutineScope {
-    val contexts = plays.mapNotNull { it.context }.distinctBy { it.uri }.take(limit)
-    val byUri = contexts.map { ctx -> async { lookup(c, ctx.uri, ctx.type) } }.awaitAll().filterNotNull().associateBy { it.uri }
-    plays.mapNotNull { h ->
-        h.context?.uri?.let(byUri::get)
-            ?: h.track.album?.let { a -> HomeItem(a.uri, a.name, "Album  ·  ${h.track.artistNames}", a.images.best()?.url, false) }
-    }.distinctBy { it.uri }
+private suspend fun fromPlays(app: AppState, plays: List<PlayHistory>, limit: Int): List<HomeItem> = coroutineScope {
+    fun albumOf(h: PlayHistory) = h.track.album?.let { a -> HomeItem(a.uri, a.name, "Album  ·  ${h.track.artistNames}", a.images.best()?.url, false) }
+    val albums = plays.mapNotNull { h -> albumOf(h)?.takeIf { it.uri == h.context?.uri } }.associateBy { it.uri }
+    val contexts = plays.mapNotNull { it.context }.distinctBy { it.uri }.filter { it.uri !in albums }.take(limit)
+    val byUri = albums + contexts.map { ctx -> async { lookup(app, ctx.uri, ctx.type) } }.awaitAll().filterNotNull().associateBy { it.uri }
+    plays.mapNotNull { h -> h.context?.uri?.let(byUri::get) ?: albumOf(h) }.distinctBy { it.uri }
 }
 
 /**
@@ -156,7 +173,8 @@ private suspend fun loadHome(app: AppState): HomeData = coroutineScope {
         if (!app.c.warehouse.supports(WarehouseFeature.Home)) null
         else orNull { app.c.warehouse.api.home() }
     }
-    val rows = feed.await()?.let { fromFeed(c, it, recent.await()) } ?: fromRecent(app, recent.await())
+    val rows = feed.await()?.let { fromFeed(app, it, recent.await()) } ?: fromRecent(app, recent.await())
+    app.c.tiles.save()
     HomeData(
         shortcuts = listOf(HomeItem("liked", "Liked Songs", "", null, false)) + rows.shortcuts,
         jumpBackIn = rows.jumpBackIn,
@@ -173,9 +191,9 @@ private suspend fun loadHome(app: AppState): HomeData = coroutineScope {
  * (playlists and artists, which it has no art for) are looked up, and dropped if that fails.
  * Plays it hasn't stored yet (it polls every 30 minutes) go first in "Jump back in".
  */
-private suspend fun fromFeed(c: Catalog, feed: HomeFeed, plays: List<PlayHistory>): HomeRows<HomeItem> = coroutineScope {
+private suspend fun fromFeed(app: AppState, feed: HomeFeed, plays: List<PlayHistory>): HomeRows<HomeItem> = coroutineScope {
     val newest = feed.jumpBackIn.maxOfOrNull { it.lastPlayedMs ?: 0 } ?: 0
-    val fresh = async { fromPlays(c, plays.filter { it.playedAtEpochMs > newest }, limit = 4) }
+    val fresh = async { fromPlays(app, plays.filter { it.playedAtEpochMs > newest }, limit = 4) }
     // Only what can be shown is looked up: each row's candidates as arranged, plus some slack.
     val candidates = arrangeHome(
         HomeRows(feed.shortcuts, feed.jumpBackIn, feed.aroundNow, feed.rediscover), { it.uri }, SHORTCUT_TILES + SLACK, ROW_CARDS + SLACK,
@@ -184,7 +202,7 @@ private suspend fun fromFeed(c: Catalog, feed: HomeFeed, plays: List<PlayHistory
         async {
             val name = e.name
             if (name != null && e.imageUrl != null) HomeItem(e.uri, name, subtitle(e), e.imageUrl, e.type == "artist")
-            else lookup(c, e.uri, e.type)
+            else lookup(app, e.uri, e.type)
         }
     }.awaitAll().filterNotNull().associateBy { it.uri }
     fun List<HomeEntry>.resolved() = mapNotNull { items[it.uri] }
@@ -205,15 +223,14 @@ private fun subtitle(e: HomeEntry) = when (e.type) {
  * (with an older warehouse) older contexts from the stored history.
  */
 private suspend fun fromRecent(app: AppState, plays: List<PlayHistory>): HomeRows<HomeItem> = coroutineScope {
-    val c = app.c.catalog
     val older = async {
         if (!app.c.warehouse.state.value.isUsable) emptyList()
         else orNull { recentContexts(HOME_CONTEXTS) { before, limit -> app.c.warehouse.api.playsPage(limit, before) } }.orEmpty()
     }
-    val recentItems = async { fromPlays(c, plays, HOME_CONTEXTS) }
+    val recentItems = async { fromPlays(app, plays, HOME_CONTEXTS) }
     val known = plays.mapNotNull { it.context?.uri }.toSet()
     val olderItems = older.await().filter { it.uri !in known }.take(HOME_CONTEXTS)
-        .map { ctx -> async { lookup(c, ctx.uri, ctx.type) } }.awaitAll().filterNotNull()
+        .map { ctx -> async { lookup(app, ctx.uri, ctx.type) } }.awaitAll().filterNotNull()
     // Older contexts whose lookup failed are left out: the warehouse has no album to fall back to.
     val resolved = (recentItems.await() + olderItems).distinctBy { it.uri }
     // "Jump back in" has only what the shortcuts don't already show; it hides when that's nothing.
@@ -236,7 +253,9 @@ private fun greeting(): String = when (LocalTime.now().hour) {
 
 @Composable
 fun HomeScreen(app: AppState) {
-    val home = load(app.c.screens, "home") { loadHome(app) }
+    // Home is the first screen, so it costs the most requests: refresh it every few minutes, not
+    // each time it's shown (tiles come from ContextTiles; recently played is what changes).
+    val home = load(app.c.screens, "home", maxAgeMs = 5 * 60_000) { loadHome(app) }
     val connection by app.c.player.connection.collectAsState()
     val liked by app.c.liked.uris.collectAsState()
     val history = rememberHomeHistory(app)
@@ -251,7 +270,7 @@ fun HomeScreen(app: AppState) {
         item { HistoryShortcuts(app) }
         when (val s = home.state) {
             Load.Loading -> item { Loading() }
-            is Load.Failed -> item { ErrorMessage(s.message, home.retry) }
+            is Load.Failed -> item { ErrorMessage(s, home.retry) }
             is Load.Done -> {
                 val d = s.value
                 item {

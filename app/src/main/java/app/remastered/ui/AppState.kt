@@ -49,7 +49,8 @@ class AppState(val c: AppContainer, private val context: Context) {
 
     fun start() {
         if (c.settings.autoConnect.on) c.player.connect()
-        if (c.settings.preloadLiked.on) c.liked.load()
+        // The saved list and new likes, or a first run's first page; the rest when it's needed.
+        if (c.settings.preloadLiked.on) c.liked.want(1)
         reloadProfile()
     }
 
@@ -143,14 +144,30 @@ class AppState(val c: AppContainer, private val context: Context) {
     }
 
     companion object {
-        fun describe(e: Throwable): String = when {
+        /**
+         * A message for [e]. With [withWait] false, a rate limit's message leaves out how long
+         * to wait, for screens that count it down beside the message ([ErrorMessage]).
+         */
+        fun describe(e: Throwable, withWait: Boolean = true): String = when {
             e is WarehouseException -> e.userMessage
-            e is CatalogException && e.isRateLimited ->
-                "Spotify is limiting requests. Try again in ${e.retryAfterMs?.let(::waitText) ?: "a minute"}."
+            e is CatalogException && e.isRateLimited -> rateLimited(e.retryAfterMs, withWait)
             e is CatalogException && e.isAuth -> "Sign in to Spotify again."
             e is CatalogException && e.isForbidden -> "Spotify doesn't allow that for this app."
             e is CatalogException && e.status == null -> "Can't reach Spotify. Check your connection."
             else -> "Something went wrong."
         }
+
+        /**
+         * A short wait is Spotify's rolling 30-second limit; a long one is its quota for
+         * Development Mode apps, shared by every app the user has, and lasts hours.
+         */
+        private fun rateLimited(ms: Long?, withWait: Boolean): String {
+            val wait = if (withWait) " Try again in ${ms?.let(::waitText) ?: "a minute"}." else ""
+            return if (ms != null && ms >= LONG_PAUSE_MS) "Spotify has paused this app's requests (its limit for developer apps). Playback still works.$wait"
+            else "Spotify is limiting requests.$wait"
+        }
+
+        /** Rate limits at least this long are Spotify's quota rather than a busy moment. */
+        const val LONG_PAUSE_MS = 10 * 60_000L
     }
 }

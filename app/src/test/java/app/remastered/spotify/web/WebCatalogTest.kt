@@ -24,12 +24,18 @@ class WebCatalogTest {
     private val tokens = FakeTokens()
     private val sleeps = mutableListOf<Long>()
     private var now = 1_000_000L
-    private val limitStore = RateLimits.InMemory()
+    private val gateStore = WebApiGate.InMemory()
     private lateinit var catalog: WebCatalog
+
+    // A budget too big to matter here; WebApiGateTest covers it. Sleeping moves the clock.
+    private fun catalog() = WebCatalog(
+        OkHttpClient(), tokens, server.url("/v1/").toString(),
+        gate = WebApiGate(gateStore, now = { now }, sleep = { sleeps += it; now += it }, burst = 1_000),
+    )
 
     @Before fun setUp() {
         server.start()
-        catalog = WebCatalog(OkHttpClient(), tokens, server.url("/v1/").toString(), sleep = { sleeps += it }, limits = RateLimits(limitStore) { now })
+        catalog = catalog()
     }
 
     @After fun tearDown() = server.close()
@@ -72,60 +78,84 @@ class WebCatalogTest {
         assertEquals(1, tokens.refreshes)
     }
 
-    @Test fun `429 honours Retry-After then succeeds`() = runTest {
+    @Test fun `429 waits out a short Retry-After and retries once`() = runTest {
         enqueue("", 429, mapOf("Retry-After" to "2"))
-        enqueue("", 429, mapOf("Retry-After" to "3"))
         enqueue("""{"id":"u1"}""")
         assertEquals("u1", catalog.me().id)
-        assertEquals(listOf(2000L, 3000L), sleeps)
-        assertEquals(3, server.requestCount)
+        assertEquals(listOf(2000L), sleeps)
+        assertEquals(2, server.requestCount)
     }
 
-    @Test fun `429 after retries throws with reason`() = runTest {
+    @Test fun `a second 429 throws with reason instead of retrying again`() = runTest {
         val quota = """{"error":{"status":429,"message":"Quota exceeded","reason":"QUOTA_EXCEEDED"}}"""
-        repeat(4) { enqueue(quota, 429, mapOf("Retry-After" to "1")) }
+        repeat(2) { enqueue(quota, 429, mapOf("Retry-After" to "1")) }
         val e = assertThrows { catalog.me() }
         assertEquals(429, e.status)
         assertEquals("QUOTA_EXCEEDED", e.reason)
         assertTrue(e.isRateLimited)
-        assertEquals(4, server.requestCount)
-        assertEquals(3, sleeps.size)
+        assertEquals(2, server.requestCount)
+        assertEquals(1, sleeps.size)
     }
 
     @Test fun `429 with long Retry-After throws immediately`() = runTest {
         enqueue("""{"error":{"status":429,"message":"slow down"}}""", 429, mapOf("Retry-After" to "3600"))
         val e = assertThrows { catalog.me() }
         assertEquals(429, e.status)
+        assertEquals(3_600_000L, e.retryAfterMs)
         assertTrue(sleeps.isEmpty())
         assertEquals(1, server.requestCount)
     }
 
-    @Test fun `429 with long Retry-After stops requests to that endpoint until it passes`() = runTest {
+    @Test fun `429 with long Retry-After pauses every endpoint until it passes`() = runTest {
         enqueue("", 429, mapOf("Retry-After" to "30630"))
         assertEquals(30_630_000L, assertThrows { catalog.likedTracks() }.retryAfterMs)
+        assertEquals(1_000_000L + 30_630_000L, gateStore.load())
 
         now += 630_000
         val e = assertThrows { catalog.likedTracks(50) }
         assertTrue(e.isRateLimited)
         assertEquals(30_000_000L, e.retryAfterMs)
+        // Another endpoint, and a write: paused too, and nothing is sent.
+        assertEquals(30_000_000L, assertThrows { catalog.me() }.retryAfterMs)
+        assertThrows { catalog.saveToLibrary(listOf("spotify:album:a1")) }
         assertEquals(1, server.requestCount)
-        assertEquals(1_000_000L + 30_630_000L, limitStore.load()["/v1/me/tracks"])
-
-        // Other endpoints are unaffected.
-        enqueue("""{"id":"u1"}""")
-        assertEquals("u1", catalog.me().id)
 
         now += 30_000_000
         enqueue("""{"items":[],"total":0}""")
+        enqueue("""{"id":"u1"}""")
         assertEquals(0, catalog.likedTracks().items.size)
+        assertEquals("u1", catalog.me().id)
         assertEquals(3, server.requestCount)
+        assertTrue(sleeps.isEmpty())
     }
 
-    @Test fun `a limit from an earlier run is honoured`() = runTest {
-        limitStore.save(mapOf("/v1/me/tracks" to now + 5_000))
-        catalog = WebCatalog(OkHttpClient(), tokens, server.url("/v1/").toString(), sleep = { sleeps += it }, limits = RateLimits(limitStore) { now })
-        assertEquals(5_000L, assertThrows { catalog.likedTracks() }.retryAfterMs)
+    @Test fun `a pause from an earlier run is honoured`() = runTest {
+        gateStore.save(now + 3_600_000)
+        catalog = catalog()
+        assertEquals(3_600_000L, assertThrows { catalog.likedTracks() }.retryAfterMs)
         assertEquals(0, server.requestCount)
+    }
+
+    @Test fun `a short pause from an earlier run is waited out`() = runTest {
+        gateStore.save(now + 5_000)
+        catalog = catalog()
+        enqueue("""{"id":"u1"}""")
+        assertEquals("u1", catalog.me().id)
+        assertEquals(listOf(5_000L), sleeps)
+    }
+
+    @Test fun `Retry-After on a 503 pauses too`() = runTest {
+        enqueue("", 503, mapOf("Retry-After" to "7200"))
+        assertEquals(503, assertThrows { catalog.me() }.status)
+        assertEquals(7_200_000L, assertThrows { catalog.me() }.retryAfterMs)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test fun `429 without Retry-After pauses briefly and retries once`() = runTest {
+        enqueue("", 429)
+        enqueue("""{"id":"u1"}""")
+        assertEquals("u1", catalog.me().id)
+        assertEquals(listOf(WebCatalog.DEFAULT_RETRY_AFTER_S * 1000), sleeps)
     }
 
     @Test fun `network failure has null status`() = runTest {

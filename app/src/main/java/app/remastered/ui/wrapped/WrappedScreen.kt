@@ -54,7 +54,7 @@ fun WrappedScreen(app: AppState) {
         }
         when (val s = ranges.state) {
             Load.Loading -> item { Loading() }
-            is Load.Failed -> item { ErrorMessage(s.message, ranges.retry) }
+            is Load.Failed -> item { ErrorMessage(s, ranges.retry) }
             is Load.Done -> if (s.value.isEmpty()) {
                 item { EmptyMessage("Nothing to wrap yet", "The warehouse hasn't offered any ranges.") }
             } else {

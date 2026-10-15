@@ -60,14 +60,18 @@ import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 
 private enum class LibKind { Playlist, Album, Artist, Show }
 private enum class LibFilter(val label: String) { Playlists("Playlists"), ByYou("By you"), Albums("Albums"), Artists("Artists"), Podcasts("Podcasts") }
 private enum class LibSort(val label: String) { Recents("Recents"), Alphabetical("Alphabetical"), Creator("Creator") }
 
+/** [ownerId] is a playlist's owner, for "By you". */
+@Serializable
 private data class LibItem(
     val uri: String, val title: String, val subtitle: String, val creator: String,
-    val imageUrl: String?, val kind: LibKind, val byYou: Boolean,
+    val imageUrl: String?, val kind: LibKind, val ownerId: String? = null,
 )
 
 /**
@@ -76,7 +80,9 @@ private data class LibItem(
  */
 @Composable
 fun LibraryScreen(app: AppState) {
-    val data = load(app.c.screens, "library", app.playlistsVersion, app.me?.id) {
+    // Kept on disk and refreshed every half hour (or after a change made here): a large library
+    // is several requests, and it changes rarely.
+    val data = load(app.c.screens, "library", app.playlistsVersion, maxAgeMs = 30 * 60_000, saver = ListSerializer(LibItem.serializer())) {
         coroutineScope {
             val c = app.c.catalog
             val playlists = async { allPages(1_000) { c.myPlaylists(it, 50) } }
@@ -85,15 +91,14 @@ fun LibraryScreen(app: AppState) {
             // Hidden, like albums and artists, if Spotify stops sharing saved shows.
             val shows = async { runCatching { allPages(1_000) { c.savedShows(it, 50) } }.getOrDefault(emptyList()) }
             playlists.await().map {
-                val mine = it.owner.id == app.me?.id
-                LibItem(it.uri, it.name, dotted("Playlist", it.owner.displayName), it.owner.displayName, it.images.best(160)?.url, LibKind.Playlist, mine)
+                LibItem(it.uri, it.name, dotted("Playlist", it.owner.displayName), it.owner.displayName, it.images.best(160)?.url, LibKind.Playlist, it.owner.id)
             } + albums.await().map { a ->
                 val by = a.artists.joinToString { it.name }
-                LibItem(a.uri, a.name, dotted("Album", by), by, a.images.best(160)?.url, LibKind.Album, false)
+                LibItem(a.uri, a.name, dotted("Album", by), by, a.images.best(160)?.url, LibKind.Album)
             } + artists.await().map {
-                LibItem(it.uri, it.name, "Artist", it.name, it.images.best(160)?.url, LibKind.Artist, false)
+                LibItem(it.uri, it.name, "Artist", it.name, it.images.best(160)?.url, LibKind.Artist)
             } + shows.await().map {
-                LibItem(it.uri, it.name, "Podcast", it.name, it.images.best(160)?.url, LibKind.Show, false)
+                LibItem(it.uri, it.name, "Podcast", it.name, it.images.best(160)?.url, LibKind.Show)
             }
         }
     }
@@ -111,12 +116,13 @@ fun LibraryScreen(app: AppState) {
         HistoryEntry("Stats", "On repeat, rhythm, top artists over time", Icons.Sort, Route.Stats),
     ) else emptyList()
 
-    val shown = remember(data.value, filter, sort, query) {
+    val myId = app.me?.id
+    val shown = remember(data.value, filter, sort, query, myId) {
         val all = data.value.orEmpty().filter { item ->
             when (filter) {
                 null -> true
                 LibFilter.Playlists -> item.kind == LibKind.Playlist
-                LibFilter.ByYou -> item.byYou
+                LibFilter.ByYou -> item.kind == LibKind.Playlist && myId != null && item.ownerId == myId
                 LibFilter.Albums -> item.kind == LibKind.Album
                 LibFilter.Artists -> item.kind == LibKind.Artist
                 LibFilter.Podcasts -> item.kind == LibKind.Show
@@ -177,7 +183,7 @@ fun LibraryScreen(app: AppState) {
         }
         when (val s = data.state) {
             Load.Loading -> item(span = { GridItemSpan(maxLineSpan) }) { Loading() }
-            is Load.Failed -> item(span = { GridItemSpan(maxLineSpan) }) { ErrorMessage(s.message, data.retry) }
+            is Load.Failed -> item(span = { GridItemSpan(maxLineSpan) }) { ErrorMessage(s, data.retry) }
             is Load.Done -> {
                 itemsIndexed(shown, key = { _, it -> it.uri }) { index, item ->
                     val playing = app.isPlaying(item.uri)

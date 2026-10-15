@@ -208,7 +208,7 @@ private fun Results(app: AppState, query: String, tab: SearchTab) {
     Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         when (val s = results.state) {
             Load.Loading -> Loading()
-            is Load.Failed -> ErrorMessage(s.message, results.retry)
+            is Load.Failed -> ErrorMessage(s, results.retry)
             is Load.Done -> {
                 val r = s.value
                 if (r.isEmpty()) { EmptyMessage("No results for \"$query\"", "Check the spelling, or try fewer words."); return@Column }

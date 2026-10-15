@@ -144,7 +144,7 @@ fun AddToPlaylistSheet(app: AppState) {
         }
         when (val s = playlists.state) {
             Load.Loading -> Loading()
-            is Load.Failed -> ErrorMessage(s.message, playlists.retry)
+            is Load.Failed -> ErrorMessage(s, playlists.retry)
             is Load.Done -> LazyColumn(Modifier.heightIn(max = 420.dp)) {
                 items(s.value, key = { it.id }) { p ->
                     PlaylistPickRow(p) { app.addToPlaylist = null; app.addTo(p, track) }
@@ -187,7 +187,7 @@ fun DevicesSheet(app: AppState) {
         Text("Connect to a device", style = Type.sectionSmall.copy(fontSize = 19.sp), color = Palette.text)
         when (val s = devices.state) {
             Load.Loading -> Loading()
-            is Load.Failed -> ErrorMessage(s.message, devices.retry)
+            is Load.Failed -> ErrorMessage(s, devices.retry)
             is Load.Done -> {
                 val active = s.value.firstOrNull { it.isActive }
                 if (active != null) ActiveDevice(app, active)
