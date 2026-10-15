@@ -2,6 +2,7 @@ package app.remastered
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -10,6 +11,8 @@ import androidx.compose.runtime.mutableStateOf
 import app.remastered.ui.RemasteredRoot
 import app.remastered.ui.wrapped.WrappedPreview
 import app.remastered.ui.theme.RemasteredTheme
+import app.remastered.warehouse.WarehouseSignIn
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -29,6 +32,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val app = application as RemasteredApp
         openNowPlaying.value = intent?.action == ACTION_OPEN_NOW_PLAYING
+        // Not again when recreated (rotation): the intent is the same, and its code is spent.
+        if (savedInstanceState == null) handleWarehouseSignIn(intent)
         // Debug builds only: `adb shell am start -n app.remastered/.MainActivity --es lyrics_preview spotify:track:…`
         // opens that track's lyrics on a local clock, for checking the lyrics view without Spotify.
         val lyricsPreview = mutableStateOf(intent.getStringExtra(EXTRA_LYRICS_PREVIEW)?.takeIf { BuildConfig.DEBUG && it.startsWith("spotify:track:") })
@@ -56,5 +61,21 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.action == ACTION_OPEN_NOW_PLAYING) openNowPlaying.value = true
+        handleWarehouseSignIn(intent)
+    }
+
+    /**
+     * The warehouse's "Sign in with Spotify" coming back (app.remastered://warehouse-auth?code=…):
+     * trade the code for a read token. Runs in the container's scope so it outlives this activity,
+     * and says how it went in a toast and in Settings → Listening history.
+     */
+    private fun handleWarehouseSignIn(intent: Intent?) {
+        val uri = intent?.data?.toString()?.takeIf { intent.action == Intent.ACTION_VIEW && WarehouseSignIn.isRedirect(it) } ?: return
+        val container = (application as RemasteredApp).container ?: return
+        val ctx = applicationContext
+        container.scope.launch {
+            val result = container.warehouse.finishSignIn(uri)
+            Toast.makeText(ctx, result.fold({ "Listening history: signed in" }, { it.message ?: "Sign-in failed" }), Toast.LENGTH_LONG).show()
+        }
     }
 }

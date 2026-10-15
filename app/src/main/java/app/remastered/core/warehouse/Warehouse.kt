@@ -68,7 +68,7 @@ class WarehouseException(
     enum class Problem {
         /** No URL or token set in Settings. Nothing was sent. */
         NotConfigured,
-        /** 401: the token is wrong or was rotated. */
+        /** 401: the token is wrong, was rotated or revoked, or expired (signed-in tokens last 90 days). */
         Unauthorized,
         /** 403: the token may not do this (a read token asking for an uncomputed Wrapped range). */
         Forbidden,
@@ -90,7 +90,7 @@ class WarehouseException(
     val userMessage: String
         get() = when (problem) {
             Problem.NotConfigured -> "Listening history isn't set up. Add your warehouse in Settings."
-            Problem.Unauthorized -> "The warehouse rejected the token. Check it in Settings."
+            Problem.Unauthorized -> "The warehouse rejected the token, or it expired. Sign in again in Settings."
             Problem.Forbidden -> message ?: "The warehouse token can't open this."
             Problem.NotFound -> "The warehouse has nothing here."
             Problem.BadRequest -> message ?: "The warehouse refused that request."

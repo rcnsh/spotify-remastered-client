@@ -14,8 +14,10 @@ Spotify: it drives the installed, unmodified Spotify app.
   - Responses are cached for at most 30 days.
 - **Listening history** (optional) comes from your own
   [music-warehouse](https://github.com/rcnsh/music-warehouse), a Cloudflare Worker that keeps
-  every play: History, Stats and Wrapped. Set its address and token in Settings → Listening
-  history; the token is stored encrypted on the phone. Without one, those features stay hidden.
+  every play: History, Stats and Wrapped. In Settings → Listening history, enter its address,
+  then either **Sign in with Spotify** (with the account that owns the warehouse; it mints a
+  read token for this phone, valid 90 days) or paste a READ_TOKEN. The token is stored
+  encrypted on the phone. Without one, those features stay hidden.
   - History: every play, newest first, by day; jump to a date, pull to refresh. Plays newer
     than the warehouse's last poll come from Spotify's recently-played.
   - Home's "On repeat" and "On this day", and "Your plays" on artist pages and in the song menu.

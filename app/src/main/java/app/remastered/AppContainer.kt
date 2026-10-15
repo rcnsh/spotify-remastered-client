@@ -17,6 +17,7 @@ import app.remastered.spicylyrics.LyricsCache
 import app.remastered.spicylyrics.SpicyLyrics
 import app.remastered.spicylyrics.SpicyLyricsApi
 import app.remastered.warehouse.KeystoreWarehouseConfigStore
+import app.remastered.warehouse.PrefsPendingSignInStore
 import app.remastered.warehouse.WarehouseServices
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -67,6 +68,7 @@ class AppContainer(val context: Context) {
         KeystoreWarehouseConfigStore(context),
         OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).addInterceptor(spotify.requests).build(),
         defaults = WarehouseServices.defaults(BuildConfig.WAREHOUSE_URL, BuildConfig.WAREHOUSE_TOKEN),
+        pendingSignIn = PrefsPendingSignInStore(context),
     )
 
     init {
