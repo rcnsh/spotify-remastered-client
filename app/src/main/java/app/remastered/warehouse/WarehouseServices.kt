@@ -28,6 +28,8 @@ class WarehouseServices(
     private val defaults: WarehouseConfig? = null,
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
+    pendingSignIn: PendingSignInStore = InMemoryPendingSignInStore(),
+    clock: () -> Long = System::currentTimeMillis,
 ) {
     private val _config = MutableStateFlow(current())
     /** Never shown in full: the token stays in here and in the Authorization header. */
@@ -52,6 +54,43 @@ class WarehouseServices(
 
     val isConfigured get() = _config.value != null
 
+    private val signIn = WarehouseSignIn(http, pendingSignIn, io, clock)
+    private val _signInStatus = MutableStateFlow(if (signIn.inProgress) "Waiting for the browser…" else null)
+    /** What "Sign in with Spotify" is doing or how it ended, for Settings; null when there's nothing to say. */
+    val signInStatus: StateFlow<String?> = _signInStatus.asStateFlow()
+
+    /**
+     * Starts "Sign in with Spotify" for the warehouse at [baseUrl] (as typed): the page to open in a
+     * Custom Tab, or null (with [signInStatus] saying why) when the address isn't usable.
+     */
+    fun startSignIn(baseUrl: String, deviceName: String): String? {
+        val base = WarehouseConfig.normalizeUrl(baseUrl) ?: run { _signInStatus.value = "Enter the warehouse's https:// address first."; return null }
+        _signInStatus.value = "Waiting for the browser…"
+        return signIn.start(base, deviceName).toString()
+    }
+
+    /** The browser couldn't be opened, so nothing will come back. */
+    fun abandonSignIn(message: String) {
+        signIn.cancel()
+        _signInStatus.value = message
+    }
+
+    /**
+     * Finishes sign-in with the warehouse's [redirect] (`app.remastered://warehouse-auth?…`): saves
+     * the read token it mints, exactly like one typed in, then [check]s it. The result's message
+     * (success or not) can be shown as is.
+     */
+    suspend fun finishSignIn(redirect: String): Result<String> {
+        _signInStatus.value = "Signing in…"
+        val result = signIn.complete(redirect).map { cfg ->
+            save(cfg)
+            check()
+            "Signed in. This phone has its own read token for 90 days."
+        }
+        _signInStatus.value = result.fold({ it }, { it.message ?: "Sign-in failed." })
+        return result
+    }
+
     fun save(config: WarehouseConfig) {
         store.save(config)
         _config.value = config
@@ -61,6 +100,8 @@ class WarehouseServices(
 
     fun clear() {
         store.clear()
+        signIn.cancel()
+        _signInStatus.value = null
         _config.value = null
         _missing.value = emptySet()
         _state.value = WarehouseState.NotConfigured

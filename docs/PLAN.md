@@ -16,8 +16,12 @@ Where the client is. Tick tasks here in the same change that finishes them.
   - [x] Native Wrapped story with App Remote soundtrack and PNG share (#3)
   - [x] Wrapped MP4 export (`MediaCodec`, optional user-picked audio) (#3)
   - [x] Verified on the phone: History, Stats, Wrapped story and export
+  - [x] Sign in with Spotify for the warehouse (its `/auth/login` with PKCE, redirect to
+        `app.remastered://warehouse-auth`), next to the pasted token
 
 ## Open
+- [ ] Warehouse sign-in on the phone: a real sign-in end to end (unit tests and the redirect
+      handler on the emulator only so far).
 - [ ] Media notification (ADR 0007): verified on the phone (card shows; play/pause, next,
       previous, like work; a tap opens Now Playing; controls keep working with Remastered
       swiped from recents). Left: Spotify keeps playing with its own notification channel off.

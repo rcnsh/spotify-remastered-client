@@ -27,7 +27,11 @@ class WarehouseServicesTest {
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val code = codes[request.url.encodedPath] ?: 200
-                val body = if (code == 200) """{"plays":[],"ranges":[]}""" else """{"error":"x"}"""
+                val body = when {
+                    code != 200 -> """{"error":"x"}"""
+                    request.url.encodedPath == "/auth/token" -> """{"id":"tok_1","token":"minted","access":"read","expires_ms":1}"""
+                    else -> """{"plays":[],"ranges":[]}"""
+                }
                 return MockResponse.Builder().code(code).body(body).build()
             }
         }
@@ -123,6 +127,34 @@ class WarehouseServicesTest {
         assertEquals(WarehouseState.NotConfigured, w.state.value)
         codes["/api/plays"] = 401
         assertEquals(Problem.Unauthorized, (w.test(config).exceptionOrNull() as app.remastered.core.warehouse.WarehouseException).problem)
+    }
+
+    @Test fun `signing in saves the minted token like a typed one, then checks it`() = runTest {
+        val store = InMemoryWarehouseConfigStore()
+        val w = services(store)
+        val page = w.startSignIn(config.baseUrl, "Android (Test)")!!
+        assertTrue(page, "/auth/login?" in page)
+        assertEquals("Waiting for the browser…", w.signInStatus.value)
+
+        assertTrue(w.finishSignIn("app.remastered://warehouse-auth?code=c").isSuccess)
+        val saved = WarehouseConfig(config.baseUrl, "minted")
+        assertEquals(saved, w.config.value)
+        assertEquals(saved, store.load())
+        assertEquals(WarehouseState.Ready, w.state.value)
+        assertTrue(w.signInStatus.value!!.startsWith("Signed in"))
+        assertEquals("/auth/token", server.takeRequest().url.encodedPath)
+        assertEquals("Bearer minted", server.takeRequest().headers["Authorization"])
+    }
+
+    @Test fun `a failed sign-in keeps the old config and says why`() = runTest {
+        val w = services(InMemoryWarehouseConfigStore(config))
+        w.startSignIn(config.baseUrl, "d")
+        assertTrue(w.finishSignIn("app.remastered://warehouse-auth?error=access_denied").isFailure)
+        assertEquals(config, w.config.value)
+        assertEquals("Sign-in cancelled.", w.signInStatus.value)
+        assertEquals(0, server.requestCount)
+        assertNull(w.startSignIn("http://music-api.example.com", "d"))
+        assertTrue(w.signInStatus.value!!.contains("address"))
     }
 
     @Test fun `defaults need a usable url and a token`() {

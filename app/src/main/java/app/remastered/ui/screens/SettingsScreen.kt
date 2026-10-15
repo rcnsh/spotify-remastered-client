@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -78,6 +79,7 @@ import app.remastered.ui.wrapped.WrappedPreview
 import app.remastered.BuildConfig
 import app.remastered.ui.theme.Type
 import app.remastered.warehouse.WarehouseConfig
+import app.remastered.warehouse.WarehouseSignIn
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -249,6 +251,8 @@ private fun WarehouseGroup(app: AppState) {
     val config by warehouse.config.collectAsState()
     val state by warehouse.state.collectAsState()
     val missing by warehouse.missing.collectAsState()
+    val signInStatus by warehouse.signInStatus.collectAsState()
+    val ctx = LocalContext.current
     var url by remember(config) { mutableStateOf(config?.baseUrl.orEmpty()) }
     // Never shown: blank means "keep the saved token".
     var token by remember(config) { mutableStateOf("") }
@@ -276,13 +280,25 @@ private fun WarehouseGroup(app: AppState) {
         }
     }
 
+    /** The warehouse's "Sign in with Spotify", in a Custom Tab; MainActivity gets the redirect. */
+    fun signIn() {
+        val page = warehouse.startSignIn(url, WarehouseSignIn.deviceName(android.os.Build.MODEL)) ?: return
+        result = null
+        try {
+            CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(ctx, Uri.parse(page))
+        } catch (_: android.content.ActivityNotFoundException) {
+            warehouse.abandonSignIn("No browser to sign in with. Install one, or enter a token instead.")
+        }
+    }
+
     Group("Listening history", "Your play history from your own music-warehouse, for History, Stats and Wrapped. " +
+        "Enter its address, then sign in with the Spotify account that owns it, or paste a READ_TOKEN. " +
         "The token is stored encrypted on this phone and never shown or logged.") {
         val status = when (val s = state) {
             WarehouseState.NotConfigured -> "Not set up. History, Stats and Wrapped are hidden."
             WarehouseState.Checking -> "Checking…"
             WarehouseState.Ready -> "Connected."
-            WarehouseState.Unauthorized -> "Token rejected. Enter a new one."
+            WarehouseState.Unauthorized -> "Token rejected or expired. Sign in again, or enter a new one."
             is WarehouseState.Unreachable -> s.message
         }
         Item("Status", if (missing.isEmpty() || state !is WarehouseState.Ready) status
@@ -291,7 +307,10 @@ private fun WarehouseGroup(app: AppState) {
         Field(token, { token = it }, if (config != null) "Token saved. Type to replace it." else "READ_TOKEN", secret = true)
         FlowRow(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Chip("Save", true, {
+            // Signing in is the way in until there's a working token; then Save is the main action again.
+            val signInFirst = (config == null || state == WarehouseState.Unauthorized) && token.isBlank()
+            Chip("Sign in with Spotify", signInFirst, ::signIn)
+            Chip("Save", !signInFirst, {
                 entered()?.let { cfg ->
                     warehouse.save(cfg)
                     token = ""
@@ -305,7 +324,7 @@ private fun WarehouseGroup(app: AppState) {
                 app.message("Warehouse removed")
             })
         }
-        result?.let { Mono(it) }
+        (result ?: signInStatus)?.let { Mono(it) }
     }
 }
 
