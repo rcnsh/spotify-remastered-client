@@ -70,7 +70,9 @@ Related repos in `~/dev`:
 - App Remote and anything logged in need the **physical phone**: emulators fail Play
   Integrity, so stock Spotify can't log in there.
 - Don't uninstall the client or Spotify on the phone; that logs the user out. The phone
-  runs the debug build (debug key); install over it with `installDebug` / `adb install -r`.
+  runs the **release build, signed with the release key** (since 2026-10-16). Install over it with
+  `./gradlew :app:assembleRelease` then `adb install -r`. A debug or profile build (debug key)
+  can't install over it without an uninstall, so check on the emulator or ask first.
 
 ## Commands
 
@@ -78,7 +80,7 @@ Related repos in `~/dev`:
 # JDK 21
 scripts/fetch-spotify-sdk.sh
 ./gradlew :app:testDebugUnitTest :app:installDebug
-./gradlew :app:assembleRelease            # minified; unsigned
+./gradlew :app:assembleRelease            # minified; signed if release.storeFile is set, else unsigned
 ./gradlew :app:installProfile             # release code, debug key: installs over debug; use for perf
 adb shell dumpsys gfxinfo app.remastered reset   # then ... gfxinfo app.remastered: frame stats
 

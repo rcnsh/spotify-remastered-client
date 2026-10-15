@@ -29,6 +29,17 @@ check(!spicyLyricsKey.startsWith("sl_sk_")) {
 // in Settings.
 val warehouseUrl = localProp("warehouse.url").trim()
 val warehouseToken = localProp("warehouse.readToken").trim()
+// Release signing: release.storeFile=/path/to/release.jks and release.keyAlias=… in
+// local.properties, never in the repo. The password comes from REMASTERED_RELEASE_PASSWORD, else
+// the macOS Keychain item spotify-remastered-release / keystore. Without a store file (CI, a
+// fresh clone) the release build stays unsigned.
+val releaseStoreFile = localProp("release.storeFile").trim()
+val releaseKeyAlias = localProp("release.keyAlias").trim().ifEmpty { "remastered" }
+fun releasePassword(): String =
+    System.getenv("REMASTERED_RELEASE_PASSWORD")?.takeIf { it.isNotEmpty() }
+        ?: providers.exec {
+            commandLine("security", "find-generic-password", "-s", "spotify-remastered-release", "-a", "keystore", "-w")
+        }.standardOutput.asText.get().trim()
 
 android {
     namespace = "app.remastered"
@@ -56,6 +67,17 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        if (releaseStoreFile.isNotEmpty()) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = releasePassword()
+                keyAlias = releaseKeyAlias
+                keyPassword = storePassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField("String", "WAREHOUSE_URL", "\"$warehouseUrl\"")
@@ -67,6 +89,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
         // Release code (R8, not debuggable) signed with the debug key, so it installs over the
         // debug build on the phone without an uninstall: for judging performance, which debug
