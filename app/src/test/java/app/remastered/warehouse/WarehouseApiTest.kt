@@ -440,10 +440,29 @@ class WarehouseApiTest {
         assertTrue(sleeps.isEmpty())
     }
 
-    @Test fun `503 without Retry-After is a server error`() = runTest {
+    @Test fun `503 needing re-authorization is a server error, not retried`() = runTest {
         enqueue("""{"error":"Spotify connection needs re-authorization.","needs_reauth":true}""", 503)
         val e = assertThrows { api.onRepeat() }
         assertEquals(Problem.ServerError, e.problem)
+        assertTrue(e.needsReauth)
+        assertTrue(e.userMessage.contains("re-authoriz"))
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test fun `needs_reauth wins over a Retry-After`() = runTest {
+        enqueue("""{"error":"Spotify connection needs re-authorization.","needs_reauth":true}""", 503, mapOf("Retry-After" to "5"))
+        val e = assertThrows { api.onRepeat() }
+        assertEquals(Problem.ServerError, e.problem)
+        assertNull(e.retryAfterS)
+        assertTrue(sleeps.isEmpty())
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test fun `503 without Retry-After or needs_reauth is a plain server error`() = runTest {
+        enqueue("<html>Bad gateway</html>", 503)
+        val e = assertThrows { api.onRepeat() }
+        assertEquals(Problem.ServerError, e.problem)
+        assertFalse(e.needsReauth)
         assertEquals(1, server.requestCount)
     }
 

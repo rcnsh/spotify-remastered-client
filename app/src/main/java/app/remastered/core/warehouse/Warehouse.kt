@@ -72,6 +72,8 @@ class WarehouseException(
     /** Seconds the warehouse asked us to wait (503 while a stat is being computed). */
     val retryAfterS: Long? = null,
     cause: Throwable? = null,
+    /** A 503 because the warehouse's Spotify grant lapsed: its owner must re-authorize it; retrying won't help. */
+    val needsReauth: Boolean = false,
 ) : Exception(message, cause) {
     enum class Problem {
         /** No URL or token set in Settings. Nothing was sent. */
@@ -86,7 +88,7 @@ class WarehouseException(
         BadRequest,
         /** 503 that outlasted our retries: the warehouse is still computing. */
         Busy,
-        /** Any other 5xx. */
+        /** Any other 5xx, including a lapsed Spotify grant ([needsReauth]). */
         ServerError,
         /** No response: offline, DNS, TLS, timeout. */
         Unreachable,
@@ -103,7 +105,9 @@ class WarehouseException(
             Problem.NotFound -> "The warehouse has nothing here."
             Problem.BadRequest -> message ?: "The warehouse refused that request."
             Problem.Busy -> "The warehouse is still working this out. Try again in a minute."
-            Problem.ServerError -> "The warehouse had a problem. Try again later."
+            Problem.ServerError ->
+                if (needsReauth) "The warehouse's Spotify connection needs re-authorizing by its owner. Stored history still works."
+                else "The warehouse had a problem. Try again later."
             Problem.Unreachable -> "Can't reach the warehouse. Check your connection."
             Problem.BadResponse -> "The warehouse sent something this version can't read."
         }

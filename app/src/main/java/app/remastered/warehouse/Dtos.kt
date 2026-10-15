@@ -8,8 +8,9 @@ import kotlinx.serialization.Serializable
 // instead of failing the whole response; mapping (Mapping.kt) drops entries without what they need.
 // Minutes and shares are Double: the warehouse rounds them today, but a fraction must still decode.
 
+/** [needsReauth]: a 503 because the warehouse's own Spotify grant lapsed (live routes), not "still computing". */
 @Serializable
-internal data class ErrorDto(val error: String? = null)
+internal data class ErrorDto(val error: String? = null, @SerialName("needs_reauth") val needsReauth: Boolean = false)
 
 // --- /api/plays, /api/daily, /api/top-artists ---
 
