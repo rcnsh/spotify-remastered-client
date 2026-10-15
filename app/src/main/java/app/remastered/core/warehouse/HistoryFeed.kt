@@ -1,5 +1,6 @@
 package app.remastered.core.warehouse
 
+import app.remastered.core.model.ContextRef
 import app.remastered.core.model.PlayHistory
 import app.remastered.core.model.best
 import java.time.Instant
@@ -99,6 +100,33 @@ class PlayPager(
 
     private val Play.key get() = playedAtMs to trackId
 }
+
+/**
+ * The playlists, albums and artists played from, newest first, at most [want]: Home's shortcuts
+ * when Spotify's 50 recent plays are all one album. Pages back at most [maxPages] pages.
+ */
+suspend fun recentContexts(
+    want: Int,
+    maxPages: Int = 4,
+    pageSize: Int = 500,
+    fetch: suspend (beforeMs: Long?, limit: Int) -> List<Play>,
+): List<ContextRef> {
+    val pager = PlayPager(pageSize = pageSize, fetch = fetch)
+    val out = LinkedHashMap<String, ContextRef>()
+    repeat(maxPages) {
+        for (p in pager.loadMore()) {
+            val uri = p.contextUri ?: continue
+            // The type from the uri: `contextType` can be missing on imported plays.
+            val type = uri.split(':').getOrNull(1)?.takeIf { it in HOME_CONTEXT_TYPES } ?: continue
+            out.getOrPut(uri) { ContextRef(uri, type) }
+            if (out.size >= want) return out.values.toList()
+        }
+        if (pager.done) return out.values.toList()
+    }
+    return out.values.toList()
+}
+
+private val HOME_CONTEXT_TYPES = setOf("playlist", "album", "artist")
 
 /** Plays (newest first) in runs of the same local day, newest day first. */
 fun groupByDay(plays: List<Play>, zone: ZoneId): List<Pair<LocalDate, List<Play>>> {

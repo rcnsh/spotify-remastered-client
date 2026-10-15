@@ -154,4 +154,33 @@ class HistoryFeedTest {
         val start = LocalDate.of(2026, 10, 25).atStartOfDay(zone).toInstant().toEpochMilli()
         assertEquals(25 * 3_600_000L, end - start)
     }
+
+    // --- Home's contexts ---
+
+    private fun from(ms: Long, context: String?) = play(ms).copy(contextUri = context)
+
+    @Test fun `contexts are distinct, newest first, and stop at want`() = runTest {
+        val api = FakePlays(listOf(
+            from(9_000, "spotify:album:a"), from(8_000, "spotify:album:a"), from(7_000, null),
+            from(6_000, "spotify:playlist:p"), from(5_000, "spotify:artist:r"), from(4_000, "spotify:album:b"),
+        ))
+        val got = recentContexts(want = 3, pageSize = 2, fetch = api::fetch)
+        assertEquals(listOf(ContextRef("spotify:album:a", "album"), ContextRef("spotify:playlist:p", "playlist"),
+            ContextRef("spotify:artist:r", "artist")), got)
+    }
+
+    @Test fun `contexts skip what Home can't open and stop at maxPages`() = runTest {
+        val api = FakePlays(listOf(
+            from(9_000, "spotify:album:a"), from(8_000, "spotify:user:u:collection"), from(7_000, "spotify:show:s"),
+            from(6_000, "spotify:album:a"), from(5_000, "spotify:album:b"), from(1_000, "spotify:album:c"),
+        ))
+        assertEquals(listOf("spotify:album:a"), recentContexts(want = 5, maxPages = 2, pageSize = 2, fetch = api::fetch).map { it.uri })
+        assertEquals(2, api.calls.size)
+    }
+
+    @Test fun `contexts end with the history`() = runTest {
+        val api = FakePlays(listOf(from(2_000, "spotify:album:a")))
+        assertEquals(1, recentContexts(want = 5, pageSize = 2, fetch = api::fetch).size)
+        assertEquals(1, api.calls.size)
+    }
 }

@@ -34,6 +34,7 @@ import app.remastered.core.Connection
 import app.remastered.core.model.TimeRange
 import app.remastered.core.model.best
 import app.remastered.core.warehouse.WarehouseFeature
+import app.remastered.core.warehouse.recentContexts
 import app.remastered.ui.AppState
 import app.remastered.ui.Load
 import app.remastered.ui.Route
@@ -68,18 +69,30 @@ private data class HomeData(
     val onRepeat: List<app.remastered.core.model.Track>,
 )
 
+/** Contexts Home resolves for its shortcuts and "Jump back in". */
+private const val HOME_CONTEXTS = 16
+
 /**
  * Home is built from the user's own listening: Spotify's personalised feed isn't available
  * to apps. Shortcuts and "Jump back in" are recently played contexts; then top artists and
  * top tracks for the last four weeks.
+ *
+ * Spotify only returns the last 50 plays, which can all be one album. With the warehouse set
+ * up, older contexts from the stored history fill in after them.
  */
 private suspend fun loadHome(app: AppState): HomeData = coroutineScope {
     val c = app.c.catalog
     val recent = async { c.recentlyPlayed(50) }
     val artists = async { runCatching { c.topArtists(TimeRange.Short, 12) }.getOrDefault(emptyList()) }
     val tracks = async { runCatching { c.topTracks(TimeRange.Short, 8) }.getOrDefault(emptyList()) }
+    val older = async {
+        if (!app.c.warehouse.state.value.isUsable) emptyList()
+        else runCatching { recentContexts(HOME_CONTEXTS) { before, limit -> app.c.warehouse.api.plays(limit, beforeMs = before) } }
+            .getOrDefault(emptyList())
+    }
     val plays = recent.await()
-    val contexts = plays.mapNotNull { it.context }.distinctBy { it.uri }.take(14)
+    val fromPlays = plays.mapNotNull { it.context }.distinctBy { it.uri }
+    val contexts = (fromPlays + older.await()).distinctBy { it.uri }.take(HOME_CONTEXTS)
     val byUri = contexts.map { ctx ->
         async {
             val id = ctx.uri.substringAfterLast(':')
@@ -95,14 +108,17 @@ private suspend fun loadHome(app: AppState): HomeData = coroutineScope {
     }.awaitAll().filterNotNull().associateBy { it.uri }
     // Plays without a context, or whose context the API won't return (Spotify-owned
     // playlists in Development Mode), fall back to the track's album so the grid stays full.
-    val resolved = plays.mapNotNull { h ->
+    val fromRecent = plays.mapNotNull { h ->
         h.context?.uri?.let(byUri::get)
             ?: h.track.album?.let { a -> HomeItem(a.uri, a.name, "Album  ·  ${h.track.artistNames}", a.images.best()?.url, false) }
-    }.distinctBy { it.uri }
+    }
+    // Older contexts whose lookup failed are left out: the warehouse has no album to fall back to.
+    val resolved = (fromRecent + contexts.mapNotNull { byUri[it.uri] }).distinctBy { it.uri }
     val liked = HomeItem("liked", "Liked Songs", "", null, false)
     HomeData(
         shortcuts = (listOf(liked) + resolved).take(8),
-        jumpBackIn = resolved.drop(7).ifEmpty { resolved },
+        // Only what the shortcuts don't already show; the section hides when that's nothing.
+        jumpBackIn = resolved.drop(7),
         topArtists = artists.await().map { HomeItem(it.uri, it.name, "", it.images.best()?.url, true) },
         onRepeat = tracks.await(),
     )
