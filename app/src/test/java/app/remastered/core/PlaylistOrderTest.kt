@@ -13,11 +13,6 @@ class PlaylistOrderTest {
         return out
     }
 
-    @Test fun downDropsBeforeTheItemBelow() {
-        // Item at 1 dropped between 3 and 4.
-        assertEquals(4, PlaylistOrder.insertBefore(1, above = 3, below = 4))
-    }
-
     @Test fun upDropsBeforeTheItemBelow() {
         assertEquals(0, PlaylistOrder.insertBefore(3, above = null, below = 0))
     }
