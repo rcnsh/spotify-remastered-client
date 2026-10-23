@@ -3,6 +3,7 @@ package app.remastered.media
 import android.content.Context
 import android.util.Log
 import app.remastered.core.Player
+import app.remastered.core.SleepTimer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -10,13 +11,22 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
- * Starts [NowPlayingService] when something starts playing (and the setting is on), and stops
- * it when the setting is turned off. The service stops itself once it has nothing to show.
+ * Starts [NowPlayingService] when something starts playing (and the setting is on, or a sleep
+ * timer is set: the service runs it), and stops it when neither holds any more. The service
+ * stops itself once it has nothing to show.
  */
-class NowPlayingNotification(private val context: Context, player: Player, enabled: StateFlow<Boolean>, scope: CoroutineScope) {
+class NowPlayingNotification(
+    private val context: Context,
+    player: Player,
+    enabled: StateFlow<Boolean>,
+    sleepTimer: StateFlow<SleepTimer.Mode?>,
+    scope: CoroutineScope,
+) {
     init {
         scope.launch {
-            combine(enabled, player.state) { on, s -> if (!on) Want.Off else if (s?.track != null && !s.isPaused) Want.Playing else Want.Either }
+            combine(enabled, sleepTimer, player.state) { on, sleep, s ->
+                if (!on && sleep == null) Want.Off else if (s?.track != null && !s.isPaused) Want.Playing else Want.Either
+            }
                 .distinctUntilChanged()
                 .collect { want ->
                     when (want) {

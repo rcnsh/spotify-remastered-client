@@ -36,6 +36,7 @@ class AppState(val c: AppContainer, private val context: Context) {
     /** A track uri whose lyrics are previewed on a local clock (Settings → Developer). */
     var lyricsPreview by mutableStateOf<String?>(null)
     var devicesOpen by mutableStateOf(false)
+    var sleepTimerOpen by mutableStateOf(false)
     var menu by mutableStateOf<TrackMenu?>(null)
     var addToPlaylist by mutableStateOf<Track?>(null)
     var me by mutableStateOf<UserRef?>(null)
@@ -66,15 +67,26 @@ class AppState(val c: AppContainer, private val context: Context) {
 
     fun openUri(uri: String?) { uri?.let(Route::of)?.let(::open) }
 
+    /** Closes the player overlays and shows [tab] at its root (a launcher shortcut). */
+    fun openTab(tab: Tab) {
+        nowPlayingOpen = false
+        queueOpen = false
+        lyricsOpen = false
+        lyricsPreview = null
+        if (nav.tab != tab) nav.select(tab)
+        nav.select(tab) // the current tab again: back to its root
+    }
+
     /** Whether [back] would do something; when false the system handles Back (leaves the app). */
     val canGoBack: Boolean
-        get() = menu != null || addToPlaylist != null || devicesOpen || lyricsPreview != null || lyricsOpen || queueOpen || nowPlayingOpen ||
+        get() = menu != null || addToPlaylist != null || devicesOpen || sleepTimerOpen || lyricsPreview != null || lyricsOpen || queueOpen || nowPlayingOpen ||
             nav.depth > 1 || nav.tab != Tab.Home
 
     fun back(): Boolean = when {
         menu != null -> { menu = null; true }
         addToPlaylist != null -> { addToPlaylist = null; true }
         devicesOpen -> { devicesOpen = false; true }
+        sleepTimerOpen -> { sleepTimerOpen = false; true }
         lyricsPreview != null -> { lyricsPreview = null; true }
         lyricsOpen -> { lyricsOpen = false; true }
         queueOpen -> { queueOpen = false; true }

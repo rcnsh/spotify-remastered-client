@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     companion object {
-        /** From the media notification (media/NowPlayingService): open Now Playing. */
+        /** From the media notification, the widget and a launcher shortcut: open Now Playing (see [Launch]). */
         const val ACTION_OPEN_NOW_PLAYING = "app.remastered.OPEN_NOW_PLAYING"
         private const val EXTRA_LYRICS_PREVIEW = "lyrics_preview"
         private const val EXTRA_WRAPPED_PREVIEW = "wrapped_preview"
@@ -25,13 +25,15 @@ class MainActivity : ComponentActivity() {
         private const val EXTRA_WRAPPED_EXPORT = "wrapped_export"
     }
 
-    private val openNowPlaying = mutableStateOf(false)
+    /** Where the intent that opened (or reopened) the activity asks to go, until the UI has gone there. */
+    private val launch = mutableStateOf<Launch?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
         val app = application as RemasteredApp
-        openNowPlaying.value = intent?.action == ACTION_OPEN_NOW_PLAYING
+        // Not again when recreated (rotation): it has been there already.
+        if (savedInstanceState == null) launch.value = Launch.of(intent?.action)
         // Not again when recreated (rotation): the intent is the same, and its code is spent.
         if (savedInstanceState == null) handleWarehouseSignIn(intent)
         // Debug builds only: `adb shell am start -n app.remastered/.MainActivity --es lyrics_preview spotify:track:…`
@@ -53,14 +55,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val container = app.container
             RemasteredTheme {
-                container?.let { RemasteredRoot(it, lyricsPreview, wrappedPreview, openNowPlaying) }
+                container?.let { RemasteredRoot(it, lyricsPreview, wrappedPreview, launch) }
             }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.action == ACTION_OPEN_NOW_PLAYING) openNowPlaying.value = true
+        Launch.of(intent.action)?.let { launch.value = it }
         handleWarehouseSignIn(intent)
     }
 

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only what Android needs as a resource; the UI's text lives in the code. -->
+<resources>
+    <string name="widget_description">What\'s playing, with play, skip and like</string>
+    <string name="shortcut_liked">Liked Songs</string>
+    <string name="shortcut_search">Search</string>
+    <string name="shortcut_now_playing">Now playing</string>
+    <string name="shortcut_wrapped">Wrapped</string>
+    <string name="shortcut_wrapped_long">Your Wrapped</string>
+</resources>
