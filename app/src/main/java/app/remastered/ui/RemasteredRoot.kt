@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.remastered.AppContainer
@@ -134,7 +135,10 @@ fun RemasteredRoot(
             }
         }
         if (app.nav.current !is Route.WrappedStory) {
-            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().fadeUp().padding(top = 28.dp).navigationBarsPadding()) {
+            // Swallow touches the chrome doesn't use (the nav-bar strip, gaps between tabs) so they
+            // don't reach the list scrolled behind it: a nav-handle long press for Circle to Search
+            // would otherwise long-press a track row first.
+            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().fadeUp().padding(top = 28.dp).pointerInput(Unit) {}.navigationBarsPadding()) {
                 MiniPlayer(app)
                 BottomBar(app)
             }
