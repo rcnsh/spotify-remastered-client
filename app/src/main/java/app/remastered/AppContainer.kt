@@ -7,9 +7,11 @@ import app.remastered.core.AppSettings
 import app.remastered.core.Catalog
 import app.remastered.core.ContextTiles
 import app.remastered.core.LikedIndex
+import app.remastered.core.LibraryLayoutStore
 import app.remastered.core.LikedSongsFile
 import app.remastered.core.Player
 import app.remastered.core.RecentSearches
+import app.remastered.core.RemoteContent
 import app.remastered.core.ScreenCache
 import app.remastered.core.lyrics.CurrentLyrics
 import app.remastered.core.lyrics.LyricsSource
@@ -41,6 +43,8 @@ class AppContainer(val context: Context) {
     val spotify = SpotifyServices(context, scope, clock, settings)
     val catalog: Catalog = spotify.catalog
     val player: Player = spotify.player
+    /** Track lists of any playlist, from the Spotify app (App Remote); null pages while it isn't connected. */
+    val content: RemoteContent = spotify.player
 
     /** Remastered's own media notification while something plays (Settings → Playback). */
     val nowPlaying = NowPlayingNotification(context, player, settings.mediaNotification.value, scope)
@@ -54,6 +58,8 @@ class AppContainer(val context: Context) {
     val tiles = ContextTiles(File(context.filesDir, HOME_TILES))
     /** What each screen loaded last, so switching between screens doesn't show a spinner every time. */
     val screens = ScreenCache(clock, dir = File(context.filesDir, SCREENS))
+    /** Pins and folders in Your Library: the app's own, kept on the phone. */
+    val library = LibraryLayoutStore(context.getSharedPreferences(PREFS_LIBRARY, Context.MODE_PRIVATE))
     val recentSearches = RecentSearches(context.getSharedPreferences(PREFS_SEARCH, Context.MODE_PRIVATE)) { settings.saveRecentSearches.on }
 
     /** Spicy Lyrics responses, at most 30 days old (their terms). */
@@ -91,6 +97,7 @@ class AppContainer(val context: Context) {
     companion object {
         const val PREFS_SETTINGS = "settings"
         const val PREFS_SEARCH = "search"
+        const val PREFS_LIBRARY = "library"
         const val LIKED_SONGS = "liked-songs.json"
         const val HOME_TILES = "home-tiles.json"
         const val SCREENS = "screens"

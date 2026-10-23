@@ -49,9 +49,20 @@ Where the client is. Tick tasks here in the same change that finishes them.
       restarts; 3 in flight and 20 per 30 s; Liked Songs paged on demand; Home tiles and
       Library kept on disk. Unit-tested; not yet verified on the phone (check once Spotify's
       pause from 2026-10-16 has passed).
-- [ ] App-owned Library folders and pins (ADR 0004).
-- [ ] Spike App Remote `getChildrenOfItem` for track lists of other people's playlists
-      (ADR 0004, open question 2).
+- [x] App-owned Library folders and pins (ADR 0004), kept on the phone (`LibraryLayout`): long-press
+      anything in Your Library to pin it or add it to a folder; + makes a playlist or a folder;
+      folders open as their own list and can be pinned, renamed and deleted; pins and folder
+      entries for things gone from Spotify are dropped. Verified on the phone: pin, new folder,
+      add two playlists, open the folder, survives a force stop, rename, delete, unpin (left as
+      it was).
+- [x] Spike App Remote `getChildrenOfItem` (ADR 0004, open question 2): it lists any playlist's
+      tracks. Other people's playlists now show their track list from App Remote (no durations,
+      no "Go to album/artist"), else header + play/shuffle. Verified on the phone: a followed
+      playlist by another user shows its 36 songs with artwork; the probe (Settings → Open a
+      Spotify uri → List children) reads the user's own and Today's Top Hits.
+- [ ] Spotify's own playlists (Today's Top Hits …) still can't open: the Web API answers 404 for
+      the playlist itself, so the screen has no header. App Remote can list their tracks; a
+      header from elsewhere (search result, or the uri alone) would make them work.
 
 ## Deferred
 - Release signing: release builds compile but are unsigned; the phone runs the debug build

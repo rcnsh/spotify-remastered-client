@@ -50,6 +50,7 @@ import app.remastered.ui.screens.AlbumScreen
 import app.remastered.ui.screens.ArtistScreen
 import app.remastered.ui.screens.HomeScreen
 import app.remastered.ui.screens.LibraryScreen
+import app.remastered.ui.screens.LibraryFolderScreen
 import app.remastered.ui.screens.LikedSongsScreen
 import app.remastered.ui.screens.PlaylistScreen
 import app.remastered.ui.screens.SearchScreen
@@ -119,6 +120,7 @@ fun RemasteredRoot(
                     Route.Search -> SearchScreen(app)
                     Route.Library -> LibraryScreen(app)
                     Route.LikedSongs -> LikedSongsScreen(app)
+                    is Route.LibraryFolder -> LibraryFolderScreen(app, route.id)
                     is Route.Playlist -> PlaylistScreen(app, route.id)
                     is Route.Album -> AlbumScreen(app, route.id)
                     is Route.Artist -> ArtistScreen(app, route.id)

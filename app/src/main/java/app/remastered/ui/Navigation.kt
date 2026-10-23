@@ -11,6 +11,8 @@ sealed interface Route {
     data object Search : Route
     data object Library : Route
     data object LikedSongs : Route
+    /** One of the app's own Library folders (ADR 0004), by [app.remastered.core.LibraryFolder.id]. */
+    data class LibraryFolder(val id: String) : Route
     data class Playlist(val id: String) : Route
     data class Album(val id: String) : Route
     data class Artist(val id: String) : Route

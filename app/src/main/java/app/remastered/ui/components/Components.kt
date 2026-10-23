@@ -215,9 +215,10 @@ fun CollectionRow(
     playing: Boolean = false,
     leadingSubIcon: ImageVector? = null,
     trailing: (@Composable () -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     Row(
-        modifier.fillMaxWidth().height(72.dp).clickable(onClick = onClick).padding(horizontal = 20.dp),
+        modifier.fillMaxWidth().height(72.dp).combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         art()

@@ -84,7 +84,7 @@ fun Sheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun MenuItem(icon: ImageVector, label: String, accent: Boolean = false, onClick: () -> Unit) {
+fun MenuItem(icon: ImageVector, label: String, accent: Boolean = false, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, Modifier.size(24.dp), tint = if (accent) Palette.accent else Palette.sub)
         Text(label, style = Type.body.copy(fontSize = 15.5.sp), color = Palette.text, modifier = Modifier.padding(start = 18.dp))
@@ -118,12 +118,13 @@ fun TrackMenuSheet(app: AppState, menu: TrackMenu) {
         if (!t.isEpisode && app.warehouseSupports(WarehouseFeature.TrackHistory)) {
             MenuItem(HistoryIcons.History, "Your plays") { then { app.open(Route.HistoryTrack(t.id)) } }
         }
-        t.album?.let { album ->
+        // Tracks listed by App Remote carry no album or artist ids.
+        t.album?.takeIf { it.id.isNotEmpty() }?.let { album ->
             // An episode's show stands in for its album.
             if (t.isEpisode) MenuItem(Icons.Podcast, "Go to show") { then { app.open(Route.Show(album.id)) } }
             else MenuItem(Icons.Disc, "Go to album") { then { app.open(Route.Album(album.id)) } }
         }
-        t.artists.firstOrNull()?.let { artist -> MenuItem(Icons.User, "Go to artist") { then { app.open(Route.Artist(artist.id)) } } }
+        t.artists.firstOrNull { it.id.isNotEmpty() }?.let { artist -> MenuItem(Icons.User, "Go to artist") { then { app.open(Route.Artist(artist.id)) } } }
         MenuItem(Icons.Share, "Share") { then { app.share(t.uri, t.name) } }
     }
 }
