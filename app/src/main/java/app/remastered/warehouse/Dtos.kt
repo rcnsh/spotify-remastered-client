@@ -61,6 +61,17 @@ internal data class TopArtistsDto(
 )
 
 @Serializable
+internal data class TopTracksDto(
+    val from: String? = null,
+    val to: String? = null,
+    val tz: String? = null,
+    val tracks: List<SongPlaysDto?> = emptyList(),
+)
+
+@Serializable
+internal data class SongPlaysDto(val id: String? = null, val name: String? = null, val artist: String? = null, val image: String? = null, val plays: Int = 0)
+
+@Serializable
 internal data class ArtistPlaysDto(@SerialName("artist_id") val artistId: String? = null, val name: String? = null, val plays: Int = 0)
 
 // --- /api/artist, /api/track, /api/on-this-day ---

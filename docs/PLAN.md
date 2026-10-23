@@ -23,6 +23,14 @@ Where the client is. Tick tasks here in the same change that finishes them.
   - [x] Home ranked from the history (warehouse `/api/home`): shortcuts by frecency and
         time of day, Jump back in, Around this time, Rediscover; recently played as fallback.
         Verified on the phone: all four rows load, nothing repeats, a card opens its album
+  - [x] Stats for any range: presets (7 and 30 days, this month, last month, this year, 12
+        months) and a custom from–to, with top songs (warehouse `/api/top-tracks`, open to a read
+        token for any range; hidden on a warehouse without it) beside top artists. Verified on
+        the phone: last month's and a custom range's top songs load
+  - [x] Save as playlist: On repeat and a range's top songs become a private playlist (one
+        create and one add, up to 100 songs), named for the range, with "Open" in the snackbar.
+        Home's Rediscover is albums, playlists and artists, so it has none. Verified on the
+        phone with one test playlist, deleted afterwards
 - **Media notification** (ADR 0007): verified on the phone (card shows; play/pause, next,
   previous, like work; a tap opens Now Playing; controls keep working with Remastered
   swiped from recents; Spotify keeps playing with its own notification channel off).

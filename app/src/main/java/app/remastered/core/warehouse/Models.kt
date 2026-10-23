@@ -59,6 +59,13 @@ data class ArtistPlays(val id: String?, val name: String, val plays: Int) {
 
 data class TopArtists(val from: LocalDate, val to: LocalDate, val timeZone: String, val artists: List<ArtistPlays>)
 
+/** A song's plays in a range, its editions (single, album, remaster) folded into the most played one, [id]. */
+data class SongPlays(val id: String?, val name: String, val artist: String?, val imageUrl: String?, val plays: Int) {
+    val uri get() = spotifyUri("track", id)
+}
+
+data class TopTracks(val from: LocalDate, val to: LocalDate, val timeZone: String, val tracks: List<SongPlays>)
+
 // --- /api/artist, /api/track, /api/on-this-day ---
 
 data class MonthPlays(val month: YearMonth, val plays: Int)

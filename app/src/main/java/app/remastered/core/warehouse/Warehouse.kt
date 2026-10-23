@@ -24,6 +24,8 @@ interface Warehouse {
     suspend fun daily(from: LocalDate, to: LocalDate, zone: ZoneId = ZoneId.systemDefault()): DailyPlays
     /** Every artist on a track counts, not just the lead. [limit] is 1–500. */
     suspend fun topArtists(from: LocalDate, to: LocalDate, zone: ZoneId = ZoneId.systemDefault(), limit: Int = 50): TopArtists
+    /** Most played songs, editions folded. Any range a read token likes, unlike Wrapped. [limit] is 1–500. */
+    suspend fun topTracks(from: LocalDate, to: LocalDate, zone: ZoneId = ZoneId.systemDefault(), limit: Int = 50): TopTracks
 
     // Pages built from history
     /** By id, by name, or both (placeholder ids from the export are folded by name). */
@@ -63,6 +65,7 @@ enum class WarehouseFeature(internal val path: String) {
     OnThisDay("api/on-this-day"),
     WrappedRanges("api/wrapped/ranges"),
     Home("api/home"),
+    TopTracks("api/top-tracks"),
 }
 
 /** A warehouse failure the UI can show. [status] is the HTTP status, or null when there wasn't one. */

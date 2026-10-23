@@ -49,6 +49,7 @@ import app.remastered.core.warehouse.TopAlbum
 import app.remastered.core.warehouse.TopAlbums
 import app.remastered.core.warehouse.TopArtists
 import app.remastered.core.warehouse.TopOverTime
+import app.remastered.core.warehouse.TopTracks
 import app.remastered.core.warehouse.WarehouseFeature
 import app.remastered.ui.AppState
 import app.remastered.ui.Route
@@ -62,6 +63,7 @@ import app.remastered.ui.components.dotted
 import app.remastered.ui.history.HistoryIcons
 import app.remastered.ui.history.Panel
 import app.remastered.ui.history.PlayRow
+import app.remastered.ui.history.SaveAsPlaylistChip
 import app.remastered.ui.history.Stat
 import app.remastered.ui.history.Swatch
 import app.remastered.ui.history.WLoaded
@@ -96,6 +98,9 @@ fun StatsScreen(app: AppState) {
 
     val daily = loadWarehouse(range) { api.daily(range.from, range.to, zone) }
     val artists = loadWarehouse(range) { api.topArtists(range.from, range.to, zone, 10) }
+    // An older warehouse has no /api/top-tracks: the section hides (learned from the check or a 404).
+    val songsServed = app.warehouseSupports(WarehouseFeature.TopTracks)
+    val songs = loadWarehouse(range, songsServed) { if (songsServed) api.topTracks(range.from, range.to, zone, TOP_SONGS) else null }
     val repeat = loadWarehouse(Unit) { api.onRepeat() }
     val rhythm = loadWarehouse(Unit) { api.rhythm() }
     val overTime = loadWarehouse(Unit) { api.topOverTime() }
@@ -116,7 +121,8 @@ fun StatsScreen(app: AppState) {
             }
             item(key = "daily") { DailySection(app, daily, range) }
             item(key = "artists") { TopArtistsSection(app, artists) }
-            item(key = "repeat") { OnRepeatSection(app, repeat) }
+            if (songsServed) item(key = "songs") { TopSongsSection(app, songs, range, today) }
+            item(key = "repeat") { OnRepeatSection(app, repeat, today) }
             item(key = "rhythm") { RhythmSection(rhythm) }
             item(key = "over-time") { OverTimeSection(overTime) }
             item(key = "eras") { ErasSection(eras) }
@@ -133,10 +139,6 @@ fun StatsScreen(app: AppState) {
 
 private val Short = DateTimeFormatter.ofPattern("d MMM")
 private val ShortYear = DateTimeFormatter.ofPattern("d MMM yyyy")
-
-/** "3 – 17 Oct 2026" style, compact enough for a chip. */
-private fun rangeText(r: DayRange): String =
-    if (r.from.year == r.to.year) "${r.from.format(Short)} – ${r.to.format(ShortYear)}" else "${r.from.format(ShortYear)} – ${r.to.format(ShortYear)}"
 
 // --- Plays per day ---
 
@@ -203,14 +205,42 @@ private fun ArtistBar(rank: Int, a: ArtistPlays, max: Int, onClick: () -> Unit) 
     }
 }
 
+// --- Top songs ---
+
+/** How many top songs a range loads (and a playlist from them holds); the first [SONGS_SHOWN] show until expanded. */
+private const val TOP_SONGS = 50
+private const val SONGS_SHOWN = 10
+
+@Composable
+private fun TopSongsSection(app: AppState, data: WLoaded<TopTracks?>, range: DayRange, today: LocalDate) {
+    val playing = app.playingUri()
+    val trackHistory = app.warehouseSupports(WarehouseFeature.TrackHistory)
+    WarehouseSection("Top songs", data) { t ->
+        val tracks = t?.tracks.orEmpty()
+        if (tracks.isEmpty()) Empty("No plays in this range.")
+        SaveAsPlaylistChip(app, rangePlaylistName("Top songs", range, today), tracks.map { it.uri }, Modifier.padding(start = 20.dp, bottom = 6.dp))
+        var all by remember(t) { mutableStateOf(false) }
+        tracks.take(if (all) tracks.size else SONGS_SHOWN).forEachIndexed { i, s ->
+            PlayRow(s.imageUrl, s.name, dotted(s.artist, plays(s.plays)),
+                onClick = { app.playTrack(s.uri) },
+                onMore = if (trackHistory && s.uri != null) ({ app.open(Route.HistoryTrack(s.id!!)) }) else null,
+                playing = s.uri != null && s.uri == playing, leading = "${i + 1}", trailing = "")
+        }
+        if (!all && tracks.size > SONGS_SHOWN) {
+            Chip("Show all ${tracks.size}", selected = false, onClick = { all = true }, modifier = Modifier.padding(start = 20.dp, top = 8.dp))
+        }
+    }
+}
+
 // --- On repeat ---
 
 @Composable
-private fun OnRepeatSection(app: AppState, data: WLoaded<OnRepeat>) {
+private fun OnRepeatSection(app: AppState, data: WLoaded<OnRepeat>, today: LocalDate) {
     val playing = app.playingUri()
     val trackHistory = app.warehouseSupports(WarehouseFeature.TrackHistory)
     WarehouseSection("On repeat", data, action = data.value?.let { "Last ${it.windowDays} days" }) { r ->
         if (r.tracks.isEmpty() && r.albums.isEmpty()) Empty("Nothing's on repeat right now: a song needs 5+ plays on 3+ days.")
+        SaveAsPlaylistChip(app, "On repeat · ${today.format(ShortYear)}", r.tracks.map { it.uri }, Modifier.padding(start = 20.dp, bottom = 6.dp))
         r.tracks.forEach { t ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
