@@ -1,7 +1,9 @@
 package app.remastered.warehouse
 
 import app.remastered.core.warehouse.ArtistHistory
+import app.remastered.core.warehouse.Concerts
 import app.remastered.core.warehouse.DailyPlays
+import app.remastered.core.warehouse.HistorySearch
 import app.remastered.core.warehouse.Eras
 import app.remastered.core.warehouse.HomeFeed
 import app.remastered.core.warehouse.OnRepeat
@@ -100,6 +102,14 @@ class WarehouseApi(
 
     override suspend fun home(zone: ZoneId): HomeFeed = get<HomeDto>("api/home") { add("tz", zone.id) }.toModel()
 
+    override suspend fun search(query: String, limit: Int): HistorySearch {
+        val q = query.trim().take(200)
+        require(q.isNotEmpty()) { "A search needs a query" }
+        return get<SearchDto>("api/search") { add("q", q); add("limit", limit.coerceIn(1, 50)) }.toModel(q)
+    }
+
+    override suspend fun concerts(): Concerts = get<ConcertsDto>("api/concerts").toModel()
+
     override suspend fun onRepeat(): OnRepeat = get<OnRepeatDto>("api/stats/on-repeat").toModel()
     override suspend fun rhythm(): Rhythm = get<RhythmDto>("api/stats/rhythm").toModel()
     override suspend fun topOverTime(): TopOverTime = get<TopOverTimeDto>("api/stats/top-over-time").toModel()
@@ -124,6 +134,9 @@ class WarehouseApi(
                     WarehouseFeature.OnThisDay -> add("date", "-")
                     WarehouseFeature.Home -> add("tz", "-")
                     WarehouseFeature.TopTracks -> add("from", "-")
+                    // No query, and a region no deployment has: both refused before any database read.
+                    WarehouseFeature.Search -> Unit
+                    WarehouseFeature.Concerts -> add("region", "-")
                     WarehouseFeature.ArtistHistory, WarehouseFeature.TrackHistory, WarehouseFeature.WrappedRanges -> Unit
                 }
             }

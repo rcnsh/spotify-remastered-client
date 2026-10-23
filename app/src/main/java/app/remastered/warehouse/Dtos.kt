@@ -458,3 +458,45 @@ internal data class DecadeShareDto(val decade: Int? = null, val share: Double = 
 
 @Serializable
 internal data class DayRunDto(val days: Int = 0, val from: String? = null, val to: String? = null)
+
+// --- /api/concerts ---
+
+@Serializable
+internal data class ConcertsDto(
+    val regions: List<ConcertRegionDto?> = emptyList(),
+    val concerts: List<ConcertDto?> = emptyList(),
+)
+
+@Serializable
+internal data class ConcertRegionDto(val key: String? = null, val label: String? = null)
+
+/** [artistList] is null on a row stored before the warehouse kept it; [artists] (names, comma-joined) is there either way. */
+@Serializable
+internal data class ConcertDto(
+    val region: String? = null,
+    val date: String? = null,
+    val time: String? = null,
+    val artists: String? = null,
+    @SerialName("artist_list") val artistList: List<ArtistRefDto?>? = null,
+    val name: String? = null,
+    val venue: String? = null,
+    val city: String? = null,
+    val status: String? = null,
+    val url: String? = null,
+    @SerialName("first_seen") val firstSeen: String? = null,
+)
+
+// --- /api/search ---
+
+@Serializable
+internal data class SearchDto(
+    val q: String? = null,
+    val artists: List<SearchArtistDto?> = emptyList(),
+    val tracks: List<SearchTrackDto?> = emptyList(),
+)
+
+@Serializable
+internal data class SearchArtistDto(val id: String? = null, val name: String? = null, val plays: Int = 0)
+
+@Serializable
+internal data class SearchTrackDto(val id: String? = null, val name: String? = null, val artist: String? = null, val plays: Int = 0)

@@ -31,6 +31,13 @@ Where the client is. Tick tasks here in the same change that finishes them.
         create and one add, up to 100 songs), named for the range, with "Open" in the snackbar.
         Home's Rediscover is albums, playlists and artists, so it has none. Verified on the
         phone with one test playlist, deleted afterwards
+  - [x] Concerts (warehouse `/api/concerts`): an "On tour" row on Home (date cards; a card opens
+        the artist page, or the ticket page for an artist without a Spotify id) and the artist's
+        upcoming gigs on the artist page (each opens its ticket page). Past and cancelled gigs
+        hidden; nothing shows without the route, on failure or with no gigs. Verified on the phone
+  - [x] Search "From your history" (warehouse `/api/search`): matching stored artists and songs
+        with play counts under Search's Top results, opening the History artist and track pages.
+        Verified on the phone
 - **Media notification** (ADR 0007): verified on the phone (card shows; play/pause, next,
   previous, like work; a tap opens Now Playing; controls keep working with Remastered
   swiped from recents; Spotify keeps playing with its own notification channel off).

@@ -53,6 +53,8 @@ import app.remastered.ui.components.ScreenPadding
 import app.remastered.ui.components.SectionHeader
 import app.remastered.ui.components.TrackRow
 import app.remastered.ui.history.onThisDay
+import app.remastered.ui.history.onTour
+import app.remastered.ui.history.rememberConcerts
 import app.remastered.ui.history.rememberHomeHistory
 import app.remastered.ui.history.warehouseOnRepeat
 import app.remastered.ui.load
@@ -63,6 +65,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import java.time.LocalDate
 import java.time.LocalTime
 
 /** A playlist, album or artist shown on Home, resolved from a recently played context. */
@@ -259,6 +262,7 @@ fun HomeScreen(app: AppState) {
     val connection by app.c.player.connection.collectAsState()
     val liked by app.c.liked.uris.collectAsState()
     val history = rememberHomeHistory(app)
+    val concerts = rememberConcerts(app)
     LazyColumn(Modifier.fillMaxSize(), contentPadding = ScreenPadding) {
         item {
             Row(Modifier.statusBarsPadding().padding(start = 20.dp, end = 20.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -289,6 +293,7 @@ fun HomeScreen(app: AppState) {
                 if (d.aroundNow.isNotEmpty()) item {
                     Carousel(app, "Around this time", d.aroundNow, size = 148, action = d.hour?.let(::partOfDay))
                 }
+                onTour(app, concerts, LocalDate.now())
                 if (d.topArtists.isNotEmpty()) item {
                     Carousel(app, "Your top artists", d.topArtists, size = 112, action = "This month")
                 }
