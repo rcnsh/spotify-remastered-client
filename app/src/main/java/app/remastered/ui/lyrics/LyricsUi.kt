@@ -78,6 +78,7 @@ import app.remastered.AppContainer
 import app.remastered.core.NowPlaying
 import app.remastered.core.PlaybackState
 import app.remastered.core.lyrics.CreditPart
+import app.remastered.core.lyrics.DotMotion
 import app.remastered.core.lyrics.Interlude
 import app.remastered.core.lyrics.LineState
 import app.remastered.core.lyrics.LyricLine
@@ -103,8 +104,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.IdentityHashMap
-import kotlin.math.PI
-import kotlin.math.sin
 
 private val Bright = Color.White
 private val Dim = Color.White.copy(alpha = .36f)
@@ -242,12 +241,10 @@ private fun LineView(
     }
 }
 
-/** How long one wave of the dots' bounce takes, first dot up to last dot down. */
-private const val BouncePeriodMs = 1_400f
-
 /**
- * Three dots over an intro or instrumental break, shown only while it plays. They light up one
- * after another across the gap and bounce in turn, on the playback clock, so they rest when paused.
+ * Three dots over an intro or instrumental break, shown only while it plays. Each one in turn grows,
+ * lights up and rises over its third of the gap, as in Spicy Lyrics ([DotMotion]), on the playback
+ * clock, so they rest when paused.
  */
 @Composable
 private fun InterludeView(interlude: Interlude, state: LineState?, time: State<Long>, style: LyricStyle) {
@@ -261,25 +258,21 @@ private fun InterludeView(interlude: Interlude, state: LineState?, time: State<L
         exit = shrinkVertically(tween(350)) + fadeOut(tween(250)) + scaleOut(tween(350), targetScale = .6f),
     ) {
         val lit = if (t != null) LyricsTimeline.dots(interlude, t) else List(3) { 1f }
-        // Where the wave is, 0 to 1. Each dot rises and falls over the 40% of it starting at its turn.
-        val wave = if (t != null) ((t - interlude.startMs) % BouncePeriodMs.toLong()) / BouncePeriodMs else 0f
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = style.gap / 2 + style.dot / 2)
                 .semantics { contentDescription = "Instrumental" },
             horizontalArrangement = Arrangement.spacedBy(style.dot * .7f, if (end) Alignment.End else Alignment.Start),
         ) {
-            lit.forEachIndexed { i, fill ->
-                val phase = wave - i * .2f
-                val lift = if (phase in 0f..<.4f) sin(PI * phase / .4f).toFloat() else 0f
+            lit.forEach { fill ->
+                val look = DotMotion.look(fill)
                 Box(
                     Modifier.size(style.dot)
                         .graphicsLayer {
-                            translationY = -lift * style.dot.toPx() * .7f
-                            val grow = .85f + .15f * fill
-                            scaleX = grow; scaleY = grow
+                            translationY = -look.lift * style.dot.toPx()
+                            scaleX = look.scale; scaleY = look.scale
                         }
                         .clip(CircleShape)
-                        .background(lerp(Dim, Bright, fill)),
+                        .background(lerp(Dim, Bright, look.brightness)),
                 )
             }
         }
