@@ -71,6 +71,7 @@ import app.remastered.ui.components.ScreenPadding
 import app.remastered.ui.components.SectionHeader
 import app.remastered.ui.components.TrackRow
 import app.remastered.ui.components.dotted
+import app.remastered.ui.history.FromYourHistory
 import app.remastered.ui.load
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
@@ -194,6 +195,7 @@ private fun LazyListScope.results(app: AppState, query: String, tab: SearchTab, 
         }
     }
     item(key = "results-$tab") { Results(app, query, tab) }
+    if (tab == SearchTab.Top) item(key = "history-results") { FromYourHistory(app, query) }
 }
 
 @Composable
