@@ -33,6 +33,8 @@ interface Warehouse {
     suspend fun onThisDay(date: LocalDate = LocalDate.now(), zone: ZoneId = ZoneId.systemDefault()): OnThisDay
     /** Home's rows, ranked from the whole history for this local hour. */
     suspend fun home(zone: ZoneId = ZoneId.systemDefault()): HomeFeed
+    /** Songs played near a track or an artist (give exactly one), best first. [limit] is 1–100. */
+    suspend fun radio(trackId: String? = null, artistId: String? = null, limit: Int = 40): Radio
 
     // Stats (cached by the warehouse; a cold one may take a few seconds)
     suspend fun onRepeat(): OnRepeat
@@ -53,7 +55,7 @@ interface Warehouse {
 }
 
 /**
- * Routes added to the warehouse after the first read API (warehouse PR #5; Home later). An older deployment
+ * Routes added to the warehouse after the first read API (warehouse PR #5; Home and Radio later). An older deployment
  * answers 404 for them; [app.remastered.warehouse.WarehouseServices.missing] says which, so the
  * features built on them hide instead of failing.
  */
@@ -63,6 +65,7 @@ enum class WarehouseFeature(internal val path: String) {
     OnThisDay("api/on-this-day"),
     WrappedRanges("api/wrapped/ranges"),
     Home("api/home"),
+    Radio("api/radio"),
 }
 
 /** A warehouse failure the UI can show. [status] is the HTTP status, or null when there wasn't one. */
