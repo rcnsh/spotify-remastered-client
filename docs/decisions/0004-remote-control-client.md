@@ -54,16 +54,25 @@ and the [Nov 2024 changes](https://developer.spotify.com/blog/2024-11-27-changes
 | | Lyrics, Canvas, DJ, Jam, Wrapped (never public) |
 
 Design response (see `docs/design/mockups/`): Home is built from the user's own listening;
-artist pages show "In your library" instead of Popular; folders are the app's own;
-playlists by other people show header + play/shuffle only.
+artist pages show "In your library" instead of Popular; folders and pins are the app's own,
+kept on the phone; playlists by other people get their track list from App Remote (open
+question 2), else header + play/shuffle only.
 
 ## Open questions (resolve before accepting)
 
 1. **Answered: stock Spotify can't log in on the emulator** (device integrity). Development
    needs a physical phone with stock Spotify logged in. Optional: confirm upstream's
    finding by trying the re-signed build on that phone with a throwaway account.
-2. **App Remote ContentApi:** can `getChildrenOfItem` list tracks of an arbitrary playlist
-   URI? If so, it fills the "playlists by other people" gap. Spike it.
+2. **Answered (2026-10-23): yes, App Remote's ContentApi lists any playlist's tracks.**
+   `getChildrenOfItem` with a bare `ListItem` built from the playlist uri (`hasChildren` true),
+   tried on the phone (App Remote SDK 0.8.0) from Settings → Developer → Open a Spotify uri →
+   "List children": one of the user's own playlists gave `total 82`, 50 tracks per page in
+   ~0.7 s; Today's Top Hits (`37i9dQZF1DXcBWIGoYBM5M`, Spotify's own) gave `total 50`, 50 tracks
+   in ~1.2 s. Each child has the track uri, title, artists as one string, artwork (an App Remote
+   image id) and whether it's playable; no durations, album, or artist/album ids. It's a read:
+   nothing plays. So other people's playlists now show their track list, read through App Remote
+   when the Web API won't share it (falling back to header + play/shuffle when App Remote isn't
+   connected or fails). Tracks listed this way have no "Go to album/artist".
 3. **Latency:** measure App Remote command round-trips, cold-connect time, and Web API page
    loads (targets in PLAN once rewritten).
 4. App Remote is labelled Beta by Spotify; confirm it still connects to 9.1.x.

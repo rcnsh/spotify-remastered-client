@@ -24,6 +24,9 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import app.remastered.core.CatalogException
 import app.remastered.core.PlaylistOrder
+import app.remastered.core.RemoteTracks
+import app.remastered.core.Connection
+import androidx.compose.runtime.LaunchedEffect
 import app.remastered.ui.components.rememberReorderState
 import app.remastered.ui.components.reorderItem
 import app.remastered.ui.components.reorderable
@@ -53,15 +56,23 @@ import app.remastered.ui.theme.Palette
 
 private enum class PlaylistSort(val label: String) { Custom("Custom order"), Added("Date added"), Title("Title"), Artist("Artist") }
 
-private class PlaylistData(val playlist: Playlist, val items: List<PlaylistItem>?)
+/** [fromRemote]: the Web API wouldn't share the items, so they came from the Spotify app (App Remote). */
+private class PlaylistData(val playlist: Playlist, val items: List<PlaylistItem>?, val fromRemote: Boolean = false)
 
 @Composable
 fun PlaylistScreen(app: AppState, id: String) {
     val data = load(app.c.screens, "playlist:$id", app.playlistsVersion) {
         val p = app.c.catalog.playlist(id)
-        // Spotify only returns items for playlists the user owns or collaborates on.
-        val items = if (p.canReadItems(app.me)) allPages { app.c.catalog.playlistItems(id, it, 50) } else null
-        PlaylistData(p, items)
+        // The Web API only returns items for playlists the user owns or collaborates on; the
+        // Spotify app lists any playlist's tracks (ADR 0004). Without either, header and play only.
+        if (p.canReadItems(app.me)) PlaylistData(p, allPages { app.c.catalog.playlistItems(id, it, 50) })
+        else RemoteTracks.load(app.c.content, p.uri).let { PlaylistData(p, it, fromRemote = it != null) }
+    }
+    // Try App Remote again once it connects, if it wasn't there for the first load.
+    val connected = app.c.player.connection.collectAsState().value == Connection.Connected
+    LaunchedEffect(connected) {
+        val d = data.value
+        if (connected && d != null && d.items == null && !d.playlist.canReadItems(app.me)) data.retry()
     }
     val list = rememberLazyListState()
     val scrolled by remember { derivedStateOf { list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 700 } }
@@ -140,7 +151,8 @@ private fun PlaylistBody(app: AppState, data: PlaylistData, list: LazyListState)
             PlaylistSort.Artist -> matching.sortedBy { it.item.track.artistNames.lowercase() }
         }
     }
-    val duration = data.items?.sumOf { it.track.durationMs }
+    // App Remote doesn't give durations.
+    val duration = data.items?.takeUnless { data.fromRemote }?.sumOf { it.track.durationMs }
 
     LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = ScreenPadding) {
         item(key = "header") {
@@ -150,7 +162,8 @@ private fun PlaylistBody(app: AppState, data: PlaylistData, list: LazyListState)
                 description = p.description,
                 ownerName = p.owner.displayName,
                 ownerImage = p.owner.images.best(64)?.url,
-                meta = dotted(songs(p.trackCount), duration?.let(::durationText)),
+                // Spotify reports 0 for playlists it won't list; App Remote's count is the real one.
+                meta = dotted(songs(if (data.fromRemote) data.items.orEmpty().size else p.trackCount), duration?.let(::durationText)),
                 playing = app.isPlaying(p.uri),
                 onPlay = { app.togglePlay(p.uri) },
                 shuffle = shuffle,

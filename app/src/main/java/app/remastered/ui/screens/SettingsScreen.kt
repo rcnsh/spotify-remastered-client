@@ -125,7 +125,7 @@ fun SettingsScreen(app: AppState) {
         onDismissRequest = { confirmReset = false },
         containerColor = Palette.surface,
         title = { Text("Reset Remastered?", style = Type.sectionSmall, color = Palette.text) },
-        text = { Text("Signs you out and deletes all settings, recent searches and cached images. Your Spotify library isn't touched.",
+        text = { Text("Signs you out and deletes all settings, recent searches, Library folders and pins, and cached images. Your Spotify library isn't touched.",
             style = Type.caption, color = Palette.sub) },
         confirmButton = {
             TextButton(onClick = {
@@ -503,6 +503,7 @@ private fun UriToolGroup(app: AppState) {
     var uri by remember { mutableStateOf("") }
     val trimmed = uri.trim()
     val route = Route.of(trimmed)
+    var children by remember { mutableStateOf<String?>(null) }
     Group("Open a Spotify uri", "spotify:album:…, spotify:playlist:…, spotify:track:… or an open.spotify.com link.") {
         Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
             .background(Palette.raised).padding(horizontal = 12.dp, vertical = 11.dp)) {
@@ -522,7 +523,31 @@ private fun UriToolGroup(app: AppState) {
                 else app.message("Lyrics need a spotify:track: uri")
             })
         }
+        // App Remote's ContentApi, read only: what Spotify lists under a uri (ADR 0004, question 2).
+        Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+            Chip("List children (App Remote)", false, {
+                if (trimmed.startsWith("spotify:")) {
+                    children = "…"
+                    app.c.scope.launch { children = probeChildren(app, trimmed) }
+                } else app.message("Not a spotify: uri")
+            })
+        }
+        children?.let { Mono(it) }
     }
+}
+
+/** First page of [uri]'s children from App Remote, with timing, as text for the probe. */
+private suspend fun probeChildren(app: AppState, uri: String): String {
+    val start = System.nanoTime()
+    return runCatching { app.c.spotify.player.children(uri, 50, 0) }.fold(
+        { page ->
+            val ms = (System.nanoTime() - start) / 1_000_000
+            if (page == null) "App Remote isn't connected"
+            else "OK in $ms ms: total ${page.total}, ${page.items.size} items\n" +
+                page.items.take(8).joinToString("\n") { "${if (it.playable) "▶" else "·"} ${it.title} · ${it.subtitle} · ${it.uri}" }
+        },
+        { "Failed: ${it.javaClass.simpleName}: ${it.message}" },
+    )
 }
 
 /** Debug builds only: open any range's Wrapped story (the `wrapped_preview` extra does the same before sign-in). */

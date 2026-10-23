@@ -4,11 +4,14 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
 import app.remastered.core.Connection
+import app.remastered.core.ContentItem
+import app.remastered.core.ContentPage
 import app.remastered.core.NowPlaying
 import app.remastered.core.OptimisticPlayback
 import app.remastered.core.PlaybackState
 import app.remastered.core.Player
 import app.remastered.core.PlayingContext
+import app.remastered.core.RemoteContent
 import app.remastered.core.RepeatMode
 import app.remastered.core.model.ArtistRef
 import com.spotify.android.appremote.api.ConnectionParams
@@ -21,6 +24,7 @@ import com.spotify.android.appremote.api.error.UserNotAuthorizedException
 import com.spotify.protocol.client.Subscription
 import com.spotify.protocol.types.Image
 import com.spotify.protocol.types.ImageUri
+import com.spotify.protocol.types.ListItem
 import com.spotify.protocol.types.Repeat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -48,7 +52,7 @@ class AppRemotePlayer(
     private val redirectUri: String,
     private val scope: CoroutineScope,
     private val clock: () -> Long,
-) : Player {
+) : Player, RemoteContent {
     private val optimistic = OptimisticPlayback(clock)
     override val state: StateFlow<PlaybackState?> = optimistic.state
     private val _connection = MutableStateFlow<Connection>(Connection.Idle)
@@ -214,6 +218,22 @@ class AppRemotePlayer(
             val call = r.imagesApi.getImage(ImageUri(raw), if (large) Image.Dimension.LARGE else Image.Dimension.MEDIUM)
             call.setResultCallback { bmp -> if (cont.isActive) cont.resume(bmp) }
             call.setErrorCallback { if (cont.isActive) cont.resume(null) }
+            cont.invokeOnCancellation { call.cancel() }
+        }
+    }
+
+    /** ContentApi's `getChildrenOfItem` with a bare item for [uri]: a read, nothing plays. */
+    override suspend fun children(uri: String, limit: Int, offset: Int): ContentPage? {
+        val r = remote?.takeIf { it.isConnected } ?: return null
+        return suspendCancellableCoroutine { cont ->
+            val call = r.contentApi.getChildrenOfItem(ListItem(uri, uri, null, null, null, false, true), limit, offset)
+            call.setResultCallback { page ->
+                val items = page.items.orEmpty().map {
+                    ContentItem(it.uri, it.title.orEmpty(), it.subtitle.orEmpty(), it.imageUri?.raw?.let { raw -> IMAGE_SCHEME + raw }, it.playable)
+                }
+                if (cont.isActive) cont.resume(ContentPage(page.total, items))
+            }
+            call.setErrorCallback { e -> if (cont.isActive) cont.resumeWith(Result.failure(e)) }
             cont.invokeOnCancellation { call.cancel() }
         }
     }

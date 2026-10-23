@@ -113,7 +113,8 @@ class AppState(val c: AppContainer, private val context: Context) {
 
     fun setLiked(uri: String, liked: Boolean, track: Track? = null) {
         c.player.setLiked(uri, liked)
-        c.liked.set(track, uri, liked)
+        // Tracks listed by App Remote have no artist or album ids: the next sync brings the full one.
+        c.liked.set(track?.takeIf { t -> t.artists.none { it.id.isEmpty() } }, uri, liked)
         message(if (liked) "Added to Liked Songs" else "Removed from Liked Songs")
     }
 

@@ -51,7 +51,7 @@ class RemasteredApp : Application(), SingletonImageLoader.Factory {
         File(filesDir, AppContainer.HOME_TILES).delete()
         File(filesDir, AppContainer.SCREENS).deleteRecursively()
         container?.warehouse?.clear()
-        listOf(AppContainer.PREFS_SETTINGS, AppContainer.PREFS_SEARCH).forEach {
+        listOf(AppContainer.PREFS_SETTINGS, AppContainer.PREFS_SEARCH, AppContainer.PREFS_LIBRARY).forEach {
             getSharedPreferences(it, Context.MODE_PRIVATE).edit().clear().commit()
         }
         restart()
