@@ -10,6 +10,7 @@ import app.remastered.core.warehouse.OnRepeat
 import app.remastered.core.warehouse.OnThisDay
 import app.remastered.core.warehouse.Play
 import app.remastered.core.warehouse.PlayPage
+import app.remastered.core.warehouse.Radio
 import app.remastered.core.warehouse.Rhythm
 import app.remastered.core.warehouse.TopAlbums
 import app.remastered.core.warehouse.TopArtists
@@ -102,6 +103,15 @@ class WarehouseApi(
 
     override suspend fun home(zone: ZoneId): HomeFeed = get<HomeDto>("api/home") { add("tz", zone.id) }.toModel()
 
+    override suspend fun radio(trackId: String?, artistId: String?, limit: Int): Radio {
+        require(trackId.isNullOrBlank() != artistId.isNullOrBlank()) { "A radio needs a track or an artist" }
+        return get<RadioDto>("api/radio") {
+            trackId?.takeIf { it.isNotBlank() }?.let { add("track", it) }
+            artistId?.takeIf { it.isNotBlank() }?.let { add("artist", it) }
+            add("limit", limit.coerceIn(1, 100))
+        }.toModel()
+    }
+
     override suspend fun search(query: String, limit: Int): HistorySearch {
         val q = query.trim().take(200)
         require(q.isNotEmpty()) { "A search needs a query" }
@@ -137,7 +147,7 @@ class WarehouseApi(
                     // No query, and a region no deployment has: both refused before any database read.
                     WarehouseFeature.Search -> Unit
                     WarehouseFeature.Concerts -> add("region", "-")
-                    WarehouseFeature.ArtistHistory, WarehouseFeature.TrackHistory, WarehouseFeature.WrappedRanges -> Unit
+                    WarehouseFeature.ArtistHistory, WarehouseFeature.TrackHistory, WarehouseFeature.WrappedRanges, WarehouseFeature.Radio -> Unit
                 }
             }
         }

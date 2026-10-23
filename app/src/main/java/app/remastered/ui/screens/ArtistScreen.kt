@@ -61,8 +61,11 @@ import app.remastered.ui.components.SectionHeader
 import app.remastered.ui.components.SubText
 import app.remastered.ui.components.TitleText
 import app.remastered.ui.components.TrackRow
+import app.remastered.ui.history.RadioIcon
 import app.remastered.ui.history.ArtistConcerts
 import app.remastered.ui.history.YourPlays
+import app.remastered.ui.history.canStartRadio
+import app.remastered.ui.history.startArtistRadio
 import app.remastered.ui.load
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
@@ -144,6 +147,10 @@ private fun ArtistBody(app: AppState, d: ArtistData, list: LazyListState) {
                 val on = following.value == true
                 Chip(if (on) "Following" else "Follow", selected = false, onClick = { app.setSaved(a.uri, !on) { following.value = it } })
                 Spacer(Modifier.width(8.dp))
+                if (app.canStartRadio()) {
+                    Chip("Radio", selected = false, onClick = { app.startArtistRadio(a.id) }, icon = RadioIcon)
+                    Spacer(Modifier.width(8.dp))
+                }
                 IconButton(Icons.Share, "Share", { app.share(a.uri, a.name) }, tint = Palette.text)
                 Spacer(Modifier.weight(1f))
                 IconButton(Icons.Shuffle, if (shuffle) "Shuffle on" else "Shuffle off", { app.c.player.setShuffle(!shuffle) },

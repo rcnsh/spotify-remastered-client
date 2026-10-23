@@ -61,6 +61,9 @@ import app.remastered.ui.components.Loading
 import app.remastered.ui.components.SubText
 import app.remastered.ui.components.TitleText
 import app.remastered.ui.history.HistoryIcons
+import app.remastered.ui.history.RadioIcon
+import app.remastered.ui.history.canStartRadio
+import app.remastered.ui.history.startRadio
 import app.remastered.ui.history.warehouseSupports
 import app.remastered.ui.load
 import app.remastered.ui.theme.Icons
@@ -112,6 +115,7 @@ fun TrackMenuSheet(app: AppState, menu: TrackMenu) {
         }
         if (!t.isEpisode) MenuItem(Icons.AddPlaylist, "Add to playlist") { then { app.addToPlaylist = t } }
         MenuItem(Icons.AddQueue, "Add to queue") { then { app.queue(t) } }
+        if (!t.isEpisode && app.canStartRadio()) MenuItem(RadioIcon, "Start radio") { then { app.startRadio(t) } }
         if (menu.playlist != null && menu.playlist.canEdit(app.me)) {
             MenuItem(Icons.Remove, "Remove from ${menu.playlist.name}") { then { app.removeFrom(menu.playlist, t) } }
         }
