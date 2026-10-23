@@ -6,6 +6,12 @@ import app.remastered.core.warehouse.ArtistPlays
 import app.remastered.core.warehouse.ArtistShare
 import app.remastered.core.warehouse.ArtistShift
 import app.remastered.core.warehouse.BiggestDay
+import app.remastered.core.warehouse.Concert
+import app.remastered.core.warehouse.ConcertArtist
+import app.remastered.core.warehouse.ConcertRegion
+import app.remastered.core.warehouse.Concerts
+import app.remastered.core.warehouse.HistorySearch
+import app.remastered.core.warehouse.HistoryTrackMatch
 import app.remastered.core.warehouse.DailyPlays
 import app.remastered.core.warehouse.DayPlays
 import app.remastered.core.warehouse.DayRun
@@ -117,6 +123,36 @@ private fun List<HomeEntryDto?>.entries() = mapNotNull { e ->
 }.distinctBy { it.uri }
 
 private val HOME_URI = Regex("spotify:(playlist|album|artist):[0-9A-Za-z]+")
+
+internal fun ConcertsDto.toModel() = Concerts(
+    regions = regions.mapNotNull { r -> r?.key?.takeIf { it.isNotBlank() }?.let { ConcertRegion(it, r.label?.takeIf { l -> l.isNotBlank() } ?: it) } },
+    concerts = concerts.mapNotNull { it?.toModel() },
+)
+
+/** Needs a name or a billed artist. Artists come from `artist_list`, else the joined names (no ids). Only https ticket links are kept. */
+private fun ConcertDto.toModel(): Concert? {
+    val billed = artistList?.mapNotNull { a -> a?.name?.takeIf { it.isNotBlank() }?.let { ConcertArtist(a.id?.takeIf { id -> id.isNotBlank() }, it) } }
+        ?.takeIf { it.isNotEmpty() }
+        ?: artists.orEmpty().split(", ").filter { it.isNotBlank() }.map { ConcertArtist(null, it.trim()) }
+    val title = name?.takeIf { it.isNotBlank() } ?: billed.firstOrNull()?.name ?: return null
+    return Concert(
+        name = title, artists = billed, date = day(date), time = time?.takeIf { TIME.matches(it) },
+        venue = venue?.takeIf { it.isNotBlank() }, city = city?.takeIf { it.isNotBlank() }, region = region,
+        status = status?.lowercase(), url = url?.takeIf { it.startsWith("https://") }, firstSeen = instant(firstSeen),
+    )
+}
+
+private val TIME = Regex("\\d{2}:\\d{2}")
+
+internal fun SearchDto.toModel(asked: String) = HistorySearch(
+    query = q ?: asked,
+    artists = artists.mapNotNull { a -> a?.name?.takeIf { it.isNotBlank() }?.let { ArtistPlays(a.id?.takeIf { id -> id.isNotBlank() }, it, a.plays) } },
+    tracks = tracks.mapNotNull { t ->
+        val id = t?.id?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        val name = t.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        HistoryTrackMatch(id, name, t.artist, t.plays)
+    },
+)
 
 internal fun OnRepeatDto.toModel() = OnRepeat(
     asOf = instant(asOf),
