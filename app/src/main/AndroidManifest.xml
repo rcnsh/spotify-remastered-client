@@ -43,7 +43,7 @@
             android:name=".media.NowPlayingService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
-        <!-- Wrapped share images (cache/wrapped/*.png), handed to the share sheet. -->
+        <!-- Share images (cache/wrapped/*.png: Wrapped and lyrics cards), handed to the share sheet. -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.wrapped"

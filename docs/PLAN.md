@@ -23,6 +23,21 @@ Where the client is. Tick tasks here in the same change that finishes them.
   - [x] Home ranked from the history (warehouse `/api/home`): shortcuts by frecency and
         time of day, Jump back in, Around this time, Rediscover; recently played as fallback.
         Verified on the phone: all four rows load, nothing repeats, a card opens its album
+  - [x] Stats for any range: presets (7 and 30 days, this month, last month, this year, 12
+        months) and a custom from–to, with top songs (warehouse `/api/top-tracks`, open to a read
+        token for any range; hidden on a warehouse without it) beside top artists. Verified on
+        the phone: last month's and a custom range's top songs load
+  - [x] Save as playlist: On repeat and a range's top songs become a private playlist (one
+        create and one add, up to 100 songs), named for the range, with "Open" in the snackbar.
+        Home's Rediscover is albums, playlists and artists, so it has none. Verified on the
+        phone with one test playlist, deleted afterwards
+  - [x] Concerts (warehouse `/api/concerts`): an "On tour" row on Home (date cards; a card opens
+        the artist page, or the ticket page for an artist without a Spotify id) and the artist's
+        upcoming gigs on the artist page (each opens its ticket page). Past and cancelled gigs
+        hidden; nothing shows without the route, on failure or with no gigs. Verified on the phone
+  - [x] Search "From your history" (warehouse `/api/search`): matching stored artists and songs
+        with play counts under Search's Top results, opening the History artist and track pages.
+        Verified on the phone
 - **Media notification** (ADR 0007): verified on the phone (card shows; play/pause, next,
   previous, like work; a tap opens Now Playing; controls keep working with Remastered
   swiped from recents; Spotify keeps playing with its own notification channel off).
@@ -55,6 +70,10 @@ Where the client is. Tick tasks here in the same change that finishes them.
       on the phone, hidden as expected against the current Worker. Playback and queueing are
       untested until the Worker is deployed.
 - [ ] App-owned Library folders and pins (ADR 0004).
+- [x] Lyrics share card: in the full-screen lyrics, long-press a line, tap neighbours (up to
+      four), Share: a PNG of the lines over the artwork colour with art, title, artist and the
+      credit (ADR 0005), through the Wrapped share sheet. Verified on the emulator (preview) and
+      the phone (release build).
 - [ ] Spike App Remote `getChildrenOfItem` for track lists of other people's playlists
       (ADR 0004, open question 2).
 

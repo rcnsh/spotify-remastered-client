@@ -24,6 +24,8 @@ interface Warehouse {
     suspend fun daily(from: LocalDate, to: LocalDate, zone: ZoneId = ZoneId.systemDefault()): DailyPlays
     /** Every artist on a track counts, not just the lead. [limit] is 1–500. */
     suspend fun topArtists(from: LocalDate, to: LocalDate, zone: ZoneId = ZoneId.systemDefault(), limit: Int = 50): TopArtists
+    /** Most played songs, editions folded. Any range a read token likes, unlike Wrapped. [limit] is 1–500. */
+    suspend fun topTracks(from: LocalDate, to: LocalDate, zone: ZoneId = ZoneId.systemDefault(), limit: Int = 50): TopTracks
 
     // Pages built from history
     /** By id, by name, or both (placeholder ids from the export are folded by name). */
@@ -35,6 +37,10 @@ interface Warehouse {
     suspend fun home(zone: ZoneId = ZoneId.systemDefault()): HomeFeed
     /** Songs played near a track or an artist (give exactly one), best first. [limit] is 1–100. */
     suspend fun radio(trackId: String? = null, artistId: String? = null, limit: Int = 40): Radio
+    /** Stored artists and songs whose names contain [query] (at most 200 characters), with play counts. [limit] is 1–50. */
+    suspend fun search(query: String, limit: Int = 10): HistorySearch
+    /** Gigs by the most played artists in the warehouse's configured regions (empty when it checks none). */
+    suspend fun concerts(): Concerts
 
     // Stats (cached by the warehouse; a cold one may take a few seconds)
     suspend fun onRepeat(): OnRepeat
@@ -55,7 +61,7 @@ interface Warehouse {
 }
 
 /**
- * Routes added to the warehouse after the first read API (warehouse PR #5; Home and Radio later). An older deployment
+ * Routes added to the warehouse after the first read API (warehouse PR #5; Home, Search, Concerts and Radio later). An older deployment
  * answers 404 for them; [app.remastered.warehouse.WarehouseServices.missing] says which, so the
  * features built on them hide instead of failing.
  */
@@ -66,6 +72,9 @@ enum class WarehouseFeature(internal val path: String) {
     WrappedRanges("api/wrapped/ranges"),
     Home("api/home"),
     Radio("api/radio"),
+    TopTracks("api/top-tracks"),
+    Search("api/search"),
+    Concerts("api/concerts"),
 }
 
 /** A warehouse failure the UI can show. [status] is the HTTP status, or null when there wasn't one. */

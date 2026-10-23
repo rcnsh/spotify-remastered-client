@@ -59,6 +59,13 @@ data class ArtistPlays(val id: String?, val name: String, val plays: Int) {
 
 data class TopArtists(val from: LocalDate, val to: LocalDate, val timeZone: String, val artists: List<ArtistPlays>)
 
+/** A song's plays in a range, its editions (single, album, remaster) folded into the most played one, [id]. */
+data class SongPlays(val id: String?, val name: String, val artist: String?, val imageUrl: String?, val plays: Int) {
+    val uri get() = spotifyUri("track", id)
+}
+
+data class TopTracks(val from: LocalDate, val to: LocalDate, val timeZone: String, val tracks: List<SongPlays>)
+
 // --- /api/artist, /api/track, /api/on-this-day ---
 
 data class MonthPlays(val month: YearMonth, val plays: Int)
@@ -132,6 +139,61 @@ data class HomeFeed(
     val aroundNow: List<HomeEntry>,
     val rediscover: List<HomeEntry>,
 )
+
+// --- /api/concerts ---
+
+/** An artist billed on a [Concert]: [id] is a Spotify id, an export `name:` placeholder, or null (Ticketmaster's name only). */
+data class ConcertArtist(val id: String?, val name: String) {
+    val uri get() = spotifyUri("artist", id)
+}
+
+/**
+ * A gig by artists from the history, found by the warehouse's daily Ticketmaster check. [date] is
+ * the venue's local date, null while it's to be announced; [time] is "HH:mm" or null. [status] is
+ * Ticketmaster's (onsale, offsale, cancelled, postponed, rescheduled). [url] is its ticket page.
+ */
+data class Concert(
+    val name: String,
+    val artists: List<ConcertArtist>,
+    val date: LocalDate?,
+    val time: String?,
+    val venue: String?,
+    val city: String?,
+    val region: String?,
+    val status: String?,
+    val url: String?,
+    val firstSeen: Instant?,
+) {
+    /** The billed artists' names, for a title. */
+    val headliners: String get() = artists.joinToString(", ") { it.name }.ifEmpty { name }
+
+    /** Whether the artist with Spotify [id] (or, for one the warehouse knows only by name, [name]) is billed. */
+    fun features(id: String?, name: String?): Boolean =
+        artists.any { (id != null && it.id == id) || (name != null && it.name.equals(name, ignoreCase = true)) }
+}
+
+data class ConcertRegion(val key: String, val label: String)
+
+/** [concerts] are soonest first, undated ones last, as the warehouse sends them. */
+data class Concerts(val regions: List<ConcertRegion>, val concerts: List<Concert>) {
+    /**
+     * What's still to come: dated [today] or later, or not dated yet, and not cancelled. With [id]
+     * or [name], only that artist's.
+     */
+    fun upcoming(today: LocalDate, id: String? = null, name: String? = null): List<Concert> = concerts.filter { c ->
+        c.status != "cancelled" && (c.date == null || !c.date.isBefore(today)) && ((id == null && name == null) || c.features(id, name))
+    }
+}
+
+// --- /api/search ---
+
+/** A song in the history matching a search; [id] is its most played edition's (maybe a `name:` placeholder). */
+data class HistoryTrackMatch(val id: String, val name: String, val artist: String?, val plays: Int) {
+    val uri get() = spotifyUri("track", id)
+}
+
+/** Stored artists and songs whose names contain [query], exact matches first, then most played. */
+data class HistorySearch(val query: String, val artists: List<ArtistPlays>, val tracks: List<HistoryTrackMatch>)
 
 // --- /api/stats/on-repeat ---
 
