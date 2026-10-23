@@ -52,7 +52,7 @@ object Diagnostics {
         Info("Client id", BuildConfig.SPOTIFY_CLIENT_ID.ifEmpty { "not set" }),
         Info("Redirect URI", BuildConfig.SPOTIFY_REDIRECT_URI),
         Info("Client secret", if (BuildConfig.SPOTIFY_CLIENT_SECRET.isEmpty()) "not set (PKCE only)" else "set"),
-        Info("Spicy Lyrics key", if (BuildConfig.SPICY_LYRICS_KEY.isEmpty()) "not set (no lyrics)" else "set"),
+        Info("Spicy Lyrics key", if (BuildConfig.SPICY_LYRICS_KEY.isEmpty()) "not set (lyrics only through the warehouse)" else "set"),
     )
 
     /** Requested scopes the session wasn't granted. */

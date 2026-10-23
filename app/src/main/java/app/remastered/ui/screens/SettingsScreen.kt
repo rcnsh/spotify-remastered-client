@@ -69,6 +69,7 @@ import app.remastered.ui.Route
 import app.remastered.ui.components.Artwork
 import app.remastered.ui.components.Chip
 import app.remastered.ui.components.IconButton
+import app.remastered.spicylyrics.LyricsEndpoint
 import app.remastered.ui.components.ScreenPadding
 import app.remastered.ui.components.SubText
 import app.remastered.ui.components.TitleText
@@ -226,8 +227,17 @@ private fun LyricsGroup(app: AppState) {
     var version by remember { mutableIntStateOf(0) }
     var stats by remember { mutableStateOf<Pair<Int, Long>?>(null) }
     LaunchedEffect(version) { stats = withContext(Dispatchers.IO) { c.lyricsCache.stats() } }
+    // Where lyrics come from follows the warehouse: whether it's usable and serves /api/lyrics.
+    val warehouseState by c.warehouse.state.collectAsState()
+    val missing by c.warehouse.missing.collectAsState()
+    val via = remember(warehouseState, missing) { c.lyrics.via() }
     Group("Lyrics", "Synced lyrics from the Spicy Lyrics API, on Now Playing. The provider and the people who synced them are credited under the lyrics.") {
         Toggle("Show lyrics", null, c.settings.lyrics)
+        Item("Source", when (via) {
+            LyricsEndpoint.Via.Warehouse -> "Your warehouse, with its own Spicy Lyrics key."
+            LyricsEndpoint.Via.Direct -> "Spicy Lyrics directly, with the key built into this app. A warehouse that serves lyrics takes over when connected."
+            null -> "Not set up. Connect a warehouse that serves lyrics under Listening history."
+        })
         Toggle("Romanization and translations", "Shown under each line when the lyrics have them.", c.settings.lyricsExtras)
         Item("Timing", when {
             offset > 0 -> "Lines show ${offset} ms early. Raise this if lyrics lag behind the song."

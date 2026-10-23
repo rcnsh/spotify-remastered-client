@@ -6,7 +6,8 @@ import java.io.File
  * Spicy Lyrics responses on disk, one file per track. Spicy Lyrics' terms allow caching but
  * require every stored response to be refetched or discarded within 30 days, so an entry is
  * deleted once it is [MAX_AGE_MS] old. "No lyrics" answers expire sooner ([NOT_FOUND_AGE_MS]) so
- * new community syncs show up. [now] is wall-clock time.
+ * new community syncs show up. An entry the warehouse already kept for a while is dated from when
+ * the warehouse fetched it (`ageMs`), so the two together stay under 30 days. [now] is wall-clock time.
  */
 class LyricsCache(private val dir: File, private val now: () -> Long = System::currentTimeMillis) {
     sealed interface Entry {
@@ -30,15 +31,15 @@ class LyricsCache(private val dir: File, private val now: () -> Long = System::c
     }
 
     @Synchronized
-    fun put(trackId: String, json: String) {
+    fun put(trackId: String, json: String, ageMs: Long = 0) {
         file(trackId, NONE).delete()
-        write(file(trackId, FOUND), json)
+        write(file(trackId, FOUND), json, ageMs)
     }
 
     @Synchronized
-    fun putNotFound(trackId: String) {
+    fun putNotFound(trackId: String, ageMs: Long = 0) {
         file(trackId, FOUND).delete()
-        write(file(trackId, NONE), "")
+        write(file(trackId, NONE), "", ageMs)
     }
 
     @Synchronized
@@ -63,12 +64,12 @@ class LyricsCache(private val dir: File, private val now: () -> Long = System::c
 
     private fun fresh(f: File, maxAge: Long): Boolean = now() - f.lastModified() in 0 until maxAge
 
-    private fun write(target: File, text: String) {
+    private fun write(target: File, text: String, ageMs: Long) {
         dir.mkdirs()
         val tmp = File(dir, target.name + ".tmp")
         tmp.writeText(text)
         if (!tmp.renameTo(target)) { target.delete(); tmp.renameTo(target) }
-        target.setLastModified(now())
+        target.setLastModified(now() - ageMs.coerceIn(0, MAX_AGE_MS))
     }
 
     private fun files(): List<File> = dir.listFiles()?.filter { it.isFile && (it.name.endsWith(FOUND) || it.name.endsWith(NONE)) }.orEmpty()

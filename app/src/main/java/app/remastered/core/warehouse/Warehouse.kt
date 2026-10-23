@@ -63,7 +63,8 @@ interface Warehouse {
 /**
  * Routes added to the warehouse after the first read API (warehouse PR #5; Home, Search, Concerts and Radio later). An older deployment
  * answers 404 for them; [app.remastered.warehouse.WarehouseServices.missing] says which, so the
- * features built on them hide instead of failing.
+ * features built on them hide instead of failing. [Lyrics] is also missing on a deployment that
+ * has no Spicy Lyrics key of its own (it's optional there).
  */
 enum class WarehouseFeature(internal val path: String) {
     ArtistHistory("api/artist"),
@@ -75,6 +76,7 @@ enum class WarehouseFeature(internal val path: String) {
     TopTracks("api/top-tracks"),
     Search("api/search"),
     Concerts("api/concerts"),
+    Lyrics("api/lyrics"),
 }
 
 /** A warehouse failure the UI can show. [status] is the HTTP status, or null when there wasn't one. */
