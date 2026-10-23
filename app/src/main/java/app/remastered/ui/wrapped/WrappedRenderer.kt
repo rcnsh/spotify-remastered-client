@@ -91,7 +91,7 @@ fun WrappedRendererHost(renderer: WrappedRenderer) {
     }
 }
 
-/** PNG files written for sharing, and the share sheet for them. */
+/** PNG files written for sharing (Wrapped frames and lyrics cards), and the share sheet for them. */
 object WrappedShare {
     private fun dir(context: Context) = File(context.cacheDir, "wrapped").apply { mkdirs() }
 

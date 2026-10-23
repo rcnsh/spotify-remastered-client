@@ -50,6 +50,10 @@ Where the client is. Tick tasks here in the same change that finishes them.
       Library kept on disk. Unit-tested; not yet verified on the phone (check once Spotify's
       pause from 2026-10-16 has passed).
 - [ ] App-owned Library folders and pins (ADR 0004).
+- [x] Lyrics share card: in the full-screen lyrics, long-press a line, tap neighbours (up to
+      four), Share: a PNG of the lines over the artwork colour with art, title, artist and the
+      credit (ADR 0005), through the Wrapped share sheet. Verified on the emulator (preview) and
+      the phone (release build).
 - [ ] Spike App Remote `getChildrenOfItem` for track lists of other people's playlists
       (ADR 0004, open question 2).
 

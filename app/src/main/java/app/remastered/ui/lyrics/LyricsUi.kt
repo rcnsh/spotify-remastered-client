@@ -1,5 +1,6 @@
 package app.remastered.ui.lyrics
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandVertically
@@ -12,6 +13,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -95,7 +99,10 @@ import app.remastered.ui.player.rememberPosition
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.util.IdentityHashMap
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -131,6 +138,9 @@ private fun rememberLyricsTime(c: AppContainer, position: State<Long>): State<Lo
  * Lyrics lines that follow [time]: the current line is kept in view, word-synced lines light up
  * syllable by syllable, and long gaps show bouncing dots. Tapping a line seeks there when [onSeek]
  * is given. Only active rows read [time], so a frame recomposes one or two rows, not the list.
+ *
+ * With [onSelect], a long press on a line (an index into `lyrics.lines`) picks it for sharing;
+ * while [selection] is set, taps go to [onSelect] instead of seeking.
  */
 @Composable
 private fun LyricLines(
@@ -145,11 +155,14 @@ private fun LyricLines(
     contentPadding: PaddingValues = PaddingValues(),
     userScroll: Boolean = true,
     footer: (@Composable () -> Unit)? = null,
+    selection: LineSelection? = null,
+    onSelect: ((Int) -> Unit)? = null,
 ) {
     val synced = lyrics.sync != Lyrics.Sync.Static
     val rows = remember(lyrics) { if (synced) LyricsTimeline.withInterludes(lyrics.lines) else lyrics.lines }
     val states by remember(rows, time) { derivedStateOf { if (synced) LyricsTimeline.states(rows, time.value) else null } }
     val focus by remember(rows, time) { derivedStateOf { if (synced) LyricsTimeline.focus(rows, time.value) else -1 } }
+    val lineIndex = remember(lyrics) { IdentityHashMap<LyricLine, Int>().apply { lyrics.lines.forEachIndexed { i, l -> put(l, i) } } }
     var placed by remember(lyrics) { mutableStateOf(false) }
     LaunchedEffect(lyrics, focus, follow) {
         if (!follow || focus < 0) return@LaunchedEffect
@@ -160,8 +173,17 @@ private fun LyricLines(
     LazyColumn(modifier, listState, contentPadding, userScrollEnabled = userScroll) {
         itemsIndexed(rows) { i, row ->
             when (row) {
-                is LyricLine -> LineView(row, lyrics.sync, states?.getOrNull(i), time, style, showExtras,
-                    onClick = if (synced && onSeek != null) ({ onSeek(row.startMs) }) else null)
+                is LyricLine -> {
+                    val index = lineIndex[row] ?: -1
+                    LineView(row, lyrics.sync, states?.getOrNull(i), time, style, showExtras,
+                        onClick = when {
+                            selection != null && onSelect != null -> ({ onSelect(index) })
+                            synced && onSeek != null -> ({ onSeek(row.startMs) })
+                            else -> null
+                        },
+                        selected = selection?.let { index in it },
+                        onLongClick = onSelect?.let { select -> { select(index) } })
+                }
                 is Interlude -> InterludeView(row, states?.getOrNull(i), time, style)
             }
         }
@@ -173,19 +195,36 @@ private fun LyricLines(
 private fun LineView(
     line: LyricLine,
     sync: Lyrics.Sync,
-    state: LineState?,
+    playState: LineState?,
     time: State<Long>,
     style: LyricStyle,
     showExtras: Boolean,
     onClick: (() -> Unit)?,
+    /** Null outside selection; else whether this line is picked for sharing. */
+    selected: Boolean? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
+    // While selecting, picked lines show bright and still, the rest dim.
+    val state = if (selected == null) playState else if (selected) null else LineState.Upcoming
     val end = line.oppositeAligned
     val textAlign = if (end) TextAlign.End else TextAlign.Start
     val scale by animateFloatAsState(if (state == null || state == LineState.Active) 1f else .96f, tween(350), label = "lineScale")
+    val highlight by animateColorAsState(if (selected == true) Color.White.copy(alpha = .14f) else Color.Transparent, tween(200), label = "lineSelected")
+    val clickLabel = when (selected) { null -> "Play from here"; true -> "Remove from selection"; false -> "Add to selection" }
     Column(
         Modifier.fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClickLabel = "Play from here", onClick = onClick) else Modifier)
-            .padding(horizontal = 24.dp, vertical = style.gap / 2)
+            .padding(horizontal = 12.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(highlight)
+            .then(when {
+                onLongClick != null -> Modifier.combinedClickable(
+                    onClickLabel = clickLabel, onLongClickLabel = "Select to share",
+                    onClick = onClick ?: {}, onLongClick = onLongClick,
+                )
+                onClick != null -> Modifier.clickable(onClickLabel = clickLabel, onClick = onClick)
+                else -> Modifier
+            })
+            .padding(horizontal = 12.dp, vertical = style.gap / 2)
             .graphicsLayer { scaleX = scale; scaleY = scale; transformOrigin = TransformOrigin(if (end) 1f else 0f, .5f) },
         horizontalAlignment = if (end) Alignment.End else Alignment.Start,
     ) {
@@ -438,6 +477,9 @@ private fun LyricsView(
     val extras by c.settings.lyricsExtras.value.collectAsState()
     val time = rememberLyricsTime(c, position)
     val lyrics = state.lyrics
+    // Lines picked for a share card (long-press a line); null when not selecting.
+    var selection by remember(lyrics) { mutableStateOf<LineSelection?>(null) }
+    BackHandler(enabled = selection != null) { selection = null }
 
     Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(top, bottom))).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -460,8 +502,10 @@ private fun LyricsView(
             LaunchedEffect(listState) {
                 listState.interactionSource.interactions.collect { if (it is DragInteraction.Start) follow = false }
             }
-            LaunchedEffect(follow, listState.isScrollInProgress) {
-                if (!follow && !listState.isScrollInProgress) { delay(6_000); follow = true }
+            LaunchedEffect(follow, listState.isScrollInProgress, selection != null) {
+                // Selecting holds the list still; following resumes once it's done.
+                if (selection != null) follow = false
+                else if (!follow && !listState.isScrollInProgress) { delay(6_000); follow = true }
             }
             val synced = lyrics.sync != Lyrics.Sync.Static
             LyricLines(
@@ -470,19 +514,24 @@ private fun LyricsView(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = if (synced) maxHeight * .22f else 12.dp, bottom = maxHeight * .5f),
                 footer = { SongWriters(lyrics, Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) },
+                selection = selection,
+                onSelect = { line -> selection = selection.let { if (it == null) LineSelection.start(line) else it.tap(line) } },
             )
             if (!synced) {
                 Text("These lyrics aren't synced to the song.", style = Type.caption, color = Color.White.copy(alpha = .6f),
                     modifier = Modifier.align(Alignment.TopCenter).padding(top = 4.dp))
             }
             val backAlpha by animateFloatAsState(if (!follow && synced) 1f else 0f, tween(200), label = "backToNow")
-            if (backAlpha > 0f) {
+            if (backAlpha > 0f && selection == null) {
                 Chip("Back to now", true, { follow = true }, Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp).graphicsLayer { alpha = backAlpha })
             }
         }
         if (lyrics != null) LyricsCredit(lyrics, Modifier.padding(horizontal = 24.dp).padding(top = 8.dp))
         val track = playback?.track
-        if (playback != null && track != null) {
+        val picked = selection
+        if (lyrics != null && picked != null) {
+            ShareBar(lyrics, picked, title, subtitle, imageUrl, tint, onDone = { selection = null })
+        } else if (playback != null && track != null) {
             Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SeekBar(position, track.durationMs, playback.canSeek, onSeek, Modifier.weight(1f))
@@ -494,6 +543,46 @@ private fun LyricsView(
         } else {
             Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+/**
+ * Replaces the player controls while lines are selected: how many, cancel, and Share, which
+ * draws a [LyricShareCard] and opens the share sheet.
+ */
+@Composable
+private fun ShareBar(lyrics: Lyrics, selection: LineSelection, title: String, artist: String?, imageUrl: String?, tint: Color, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var sharing by remember { mutableStateOf(false) }
+    var failed by remember(selection) { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 16.dp, top = 6.dp, bottom = 8.dp).height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(Icons.Close, "Cancel selection", onDone, tint = Palette.text)
+        Text(
+            when {
+                failed -> "Couldn't make the image."
+                selection.size == LineSelection.MAX -> "${selection.size} lines, the most a card holds"
+                else -> "${selection.size} ${if (selection.size == 1) "line" else "lines"} · tap next to add"
+            },
+            style = Type.bodyRegular, color = Color.White.copy(alpha = .8f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+        )
+        Chip(if (sharing) "Sharing…" else "Share", true, {
+            if (sharing) return@Chip
+            sharing = true
+            failed = false
+            scope.launch {
+                try {
+                    val lines = selection.texts(lyrics.lines.map { it.lead.text })
+                    LyricShareCard.share(context, lyrics, lines, title, artist, imageUrl, tint)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    failed = true
+                } finally {
+                    sharing = false
+                }
+            }
+        }, icon = Icons.Share)
     }
 }
 
