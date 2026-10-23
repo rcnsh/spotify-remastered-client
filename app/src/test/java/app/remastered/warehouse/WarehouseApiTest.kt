@@ -143,6 +143,25 @@ class WarehouseApiTest {
         assertNull(top.artists[1].uri)
     }
 
+    @Test fun `top tracks for any range`() = runTest {
+        enqueue("""{"from":"2026-09-01","to":"2026-09-30","tz":"Asia/Singapore",
+            "tracks":[{"id":"$TRACK_ID","name":"Song A","artist":"Ada","image":"https://i/a","plays":29},
+                      {"id":"name:b","name":"Song B","artist":null,"image":null,"plays":3},{"plays":1}]}""")
+        val top = api.topTracks(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), SGT, limit = 900)
+        val req = take()
+        assertEquals("/api/top-tracks", req.path)
+        assertEquals("2026-09-01", req.query("from"))
+        assertEquals("2026-09-30", req.query("to"))
+        assertEquals("Asia/Singapore", req.query("tz"))
+        assertEquals("500", req.query("limit"))
+        assertEquals(listOf("Song A", "Song B"), top.tracks.map { it.name })
+        assertEquals("spotify:track:$TRACK_ID", top.tracks[0].uri)
+        assertEquals(29, top.tracks[0].plays)
+        // An export placeholder id can't be played or saved.
+        assertNull(top.tracks[1].uri)
+        assertNull(top.tracks[1].artist)
+    }
+
     @Test fun `artist history by name`() = runTest {
         enqueue("""{"artist":{"id":"$ARTIST_ID","name":"Ada"},"plays":20,"minutes":53,
             "first_played":"2024-03-28T20:34:53.000Z","last_played":"2026-09-18T22:14:42.023Z",
@@ -546,6 +565,9 @@ class WarehouseApiTest {
         assertEquals("-", take().query("date"))
         assertEquals(true, api.serves(WarehouseFeature.Home))
         assertEquals("-", take().query("tz"))
+        enqueue("""{"error":"Not found"}""", 404)
+        assertEquals(false, api.serves(WarehouseFeature.TopTracks))
+        assertEquals("/api/top-tracks", take().path)
         server.close()
         assertNull(api.serves(WarehouseFeature.WrappedRanges))
     }

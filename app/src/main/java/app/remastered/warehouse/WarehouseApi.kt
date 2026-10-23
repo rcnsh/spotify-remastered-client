@@ -14,6 +14,7 @@ import app.remastered.core.warehouse.Rhythm
 import app.remastered.core.warehouse.TopAlbums
 import app.remastered.core.warehouse.TopArtists
 import app.remastered.core.warehouse.TopOverTime
+import app.remastered.core.warehouse.TopTracks
 import app.remastered.core.warehouse.TrackHistory
 import app.remastered.core.warehouse.Warehouse
 import app.remastered.core.warehouse.WarehouseException
@@ -80,6 +81,10 @@ class WarehouseApi(
         get<TopArtistsDto>("api/top-artists") { range(from, to); add("tz", zone.id); add("limit", limit.coerceIn(1, 500)) }
             .toModel(from, to, zone.id)
 
+    override suspend fun topTracks(from: LocalDate, to: LocalDate, zone: ZoneId, limit: Int): TopTracks =
+        get<TopTracksDto>("api/top-tracks") { range(from, to); add("tz", zone.id); add("limit", limit.coerceIn(1, 500)) }
+            .toModel(from, to, zone.id)
+
     override suspend fun artist(id: String?, name: String?, zone: ZoneId): ArtistHistory {
         require(!id.isNullOrBlank() || !name.isNullOrBlank()) { "An artist needs an id or a name" }
         return get<ArtistHistoryDto>("api/artist") {
@@ -120,7 +125,7 @@ class WarehouseApi(
     /**
      * Whether this deployment serves [feature]: true or false, or null when the warehouse couldn't
      * be reached. Asks with parameters the warehouse rejects (400) before touching its database,
-     * except for the ranges list, which is cheap.
+     * except for the ranges list and top songs (its cache key, a few rows), which are cheap.
      */
     suspend fun serves(feature: WarehouseFeature): Boolean? = try {
         withContext(io) {
@@ -128,6 +133,7 @@ class WarehouseApi(
                 when (feature) {
                     WarehouseFeature.OnThisDay -> add("date", "-")
                     WarehouseFeature.Home -> add("tz", "-")
+                    WarehouseFeature.TopTracks -> add("from", "-")
                     // No query, and a region no deployment has: both refused before any database read.
                     WarehouseFeature.Search -> Unit
                     WarehouseFeature.Concerts -> add("region", "-")

@@ -44,7 +44,9 @@ import app.remastered.core.warehouse.Streak
 import app.remastered.core.warehouse.StreakSet
 import app.remastered.core.warehouse.TopAlbum
 import app.remastered.core.warehouse.TopAlbums
+import app.remastered.core.warehouse.SongPlays
 import app.remastered.core.warehouse.TopArtists
+import app.remastered.core.warehouse.TopTracks
 import app.remastered.core.warehouse.TopOverTime
 import app.remastered.core.warehouse.TrackHistory
 import app.remastered.core.warehouse.TrackPlays
@@ -84,6 +86,13 @@ internal fun TopArtistsDto.toModel(from: LocalDate, to: LocalDate, zone: String)
     to = day(this.to) ?: to,
     timeZone = tz ?: zone,
     artists = artists.mapNotNull { a -> a?.name?.let { ArtistPlays(a.artistId, it, a.plays) } },
+)
+
+internal fun TopTracksDto.toModel(from: LocalDate, to: LocalDate, zone: String) = TopTracks(
+    from = day(this.from) ?: from,
+    to = day(this.to) ?: to,
+    timeZone = tz ?: zone,
+    tracks = tracks.mapNotNull { t -> t?.name?.let { SongPlays(t.id?.takeIf { id -> id.isNotBlank() }, it, t.artist, t.image, t.plays) } },
 )
 
 internal fun ArtistHistoryDto.toModel(): ArtistHistory {
