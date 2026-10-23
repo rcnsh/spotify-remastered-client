@@ -6,6 +6,7 @@ import app.remastered.core.warehouse.WarehouseException
 import app.remastered.core.warehouse.WarehouseFeature
 import app.remastered.core.warehouse.WarehouseException.Problem
 import app.remastered.core.warehouse.WarehouseState
+import app.remastered.spicylyrics.LyricsEndpoint
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -48,6 +49,12 @@ class WarehouseServices(
     private val client = WarehouseApi(http, { _config.value }, io, sleep, ::observe)
     /** Throws [WarehouseException] with [Problem.NotConfigured] (sending nothing) until a config is set. */
     val api: Warehouse = client
+
+    /** Lyrics through the warehouse's Spicy Lyrics proxy. Use it only while [supports] says [WarehouseFeature.Lyrics]. */
+    val lyrics: LyricsEndpoint = object : LyricsEndpoint {
+        override val via = LyricsEndpoint.Via.Warehouse
+        override suspend fun fetch(trackId: String) = client.lyrics(trackId)
+    }
 
     /** Whether to show a feature built on [feature]'s route now. Not observable: collect [state] and [missing]. */
     fun supports(feature: WarehouseFeature) = state.value.isUsable && feature !in missing.value

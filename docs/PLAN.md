@@ -73,6 +73,12 @@ Where the client is. Tick tasks here in the same change that finishes them.
       the mockup); runs in the media notification's service (ADR 0007). Verified on the phone:
       5 minutes paused Spotify with Remastered swiped from recents, End of song paused at 4:30 of
       4:31; the notification shows when it pauses.
+- [ ] Lyrics through the warehouse (ADR 0005, music-warehouse `/api/lyrics`): the warehouse's
+      own Spicy Lyrics secret key when it serves the route, else the built-in publishable key, else
+      not set up; `spicylyrics.key` is optional. Settings → Lyrics shows the source. Unit-tested
+      (MockWebServer), and the Worker checked locally against the live API. To switch: set the
+      Worker's `SPICY_LYRICS_SECRET_KEY` and deploy, then drop `spicylyrics.key` and CI's
+      `SPICY_LYRICS_KEY`. Not yet verified on the phone.
 - [ ] Home screen widget (RemoteViews): cover, title, artist, previous, play/pause, next, like;
       idle state when Spotify isn't connected, a tap opens Now Playing. Idle state and tap checked
       on an emulator; the playing state and buttons are not yet verified on the phone (add it from

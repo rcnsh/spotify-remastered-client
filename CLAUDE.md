@@ -30,8 +30,8 @@ Kotlin + Jetpack Compose, one module `app/`, package root `app.remastered`:
 - `scripts/`: `fetch-spotify-sdk.sh` (App Remote + Auth AARs into `app/libs`, gitignored),
   `emulator.sh`.
 
-`local.properties` holds the Spotify app settings, Spicy Lyrics key, and warehouse URL and
-token. It's gitignored: never commit it.
+`local.properties` holds the Spotify app settings, the Spicy Lyrics key (optional: lyrics come
+through the warehouse when it serves them), and warehouse URL and token. It's gitignored: never commit it.
 
 Related repos in `~/dev`:
 - `music-warehouse`: the Worker the client reads. Uses Wrangler (`wrangler.jsonc`); keep it.

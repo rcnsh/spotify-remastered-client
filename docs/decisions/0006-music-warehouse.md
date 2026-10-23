@@ -24,7 +24,9 @@ polls their play history into D1 every 30 minutes and serves it over a small API
   the daily cron warms them. Arbitrary ranges stay ADMIN_TOKEN only.
 - **New warehouse routes** for the client: `/api/wrapped/ranges`, `/api/artist`,
   `/api/track`, `/api/on-this-day`, and later `/api/home` (Home's rows, ranked from the
-  history, since Spotify's own home isn't open to apps).
+  history, since Spotify's own home isn't open to apps) and, optional on the warehouse,
+  `/api/lyrics` (2026-10-23: Spicy Lyrics with the warehouse's secret key, so the APK needs no
+  lyrics key; see 0005).
 - **Features**, each hidden while the warehouse isn't configured:
   - full History, merged with `recently-played` for the plays newer than the last poll;
   - Home's "On repeat" from `/api/stats/on-repeat`, falling back to the Web API;

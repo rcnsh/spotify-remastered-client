@@ -345,7 +345,7 @@ private fun message(state: LyricsState): String? = when (state) {
         is LyricsResult.Found -> null
         LyricsResult.NotFound -> "No lyrics for this song yet."
         LyricsResult.Unsupported -> "Lyrics are only available for songs."
-        LyricsResult.NotConfigured -> "Lyrics aren't set up: add spicylyrics.key to client/local.properties and rebuild."
+        LyricsResult.NotConfigured -> "Lyrics aren't set up: connect a warehouse that serves them in Settings, or build with spicylyrics.key."
         is LyricsResult.Failed -> when (r.problem) {
             LyricsResult.Problem.Offline -> "Can't reach Spicy Lyrics. Check your connection."
             LyricsResult.Problem.RateLimited -> "Too many lyrics requests." + (r.retryAfterMs?.let { " Try again in ${(it + 999) / 1000} s." } ?: "")

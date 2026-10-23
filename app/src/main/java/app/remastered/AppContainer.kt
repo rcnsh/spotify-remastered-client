@@ -16,6 +16,7 @@ import app.remastered.core.ScreenCache
 import app.remastered.core.SleepTimer
 import app.remastered.core.lyrics.CurrentLyrics
 import app.remastered.core.lyrics.LyricsSource
+import app.remastered.core.warehouse.WarehouseFeature
 import app.remastered.media.NowPlayingNotification
 import app.remastered.media.NowPlayingWidgets
 import app.remastered.spicylyrics.LyricsCache
@@ -68,15 +69,6 @@ class AppContainer(val context: Context) {
     val library = LibraryLayoutStore(context.getSharedPreferences(PREFS_LIBRARY, Context.MODE_PRIVATE))
     val recentSearches = RecentSearches(context.getSharedPreferences(PREFS_SEARCH, Context.MODE_PRIVATE)) { settings.saveRecentSearches.on }
 
-    /** Spicy Lyrics responses, at most 30 days old (their terms). */
-    val lyricsCache = LyricsCache(File(context.cacheDir, "lyrics"))
-    /** Requests show up in Settings → Web API requests (path and status only, never the key). */
-    val lyricsSource: LyricsSource = SpicyLyrics(
-        SpicyLyricsApi(OkHttpClient.Builder().callTimeout(20, TimeUnit.SECONDS).addInterceptor(spotify.requests).build(), BuildConfig.SPICY_LYRICS_KEY),
-        lyricsCache,
-    )
-    val currentLyrics = CurrentLyrics(player, lyricsSource, settings.lyrics.value, scope)
-
     /**
      * Listening history from the user's music-warehouse (Settings → Listening history). Features
      * built on it check [WarehouseServices.state] and hide themselves when it isn't usable.
@@ -88,6 +80,28 @@ class AppContainer(val context: Context) {
         defaults = WarehouseServices.defaults(BuildConfig.WAREHOUSE_URL, BuildConfig.WAREHOUSE_TOKEN),
         pendingSignIn = PrefsPendingSignInStore(context),
     )
+
+    /** Spicy Lyrics responses, at most 30 days old (their terms). */
+    val lyricsCache = LyricsCache(File(context.cacheDir, "lyrics"))
+    /** Spicy Lyrics directly, when this build has a publishable key (`spicylyrics.key`); optional. */
+    private val spicyLyricsApi =
+        SpicyLyricsApi(OkHttpClient.Builder().callTimeout(20, TimeUnit.SECONDS).addInterceptor(spotify.requests).build(), BuildConfig.SPICY_LYRICS_KEY)
+    /**
+     * Lyrics through the warehouse while it serves them (its own key, ADR 0005), else Spicy Lyrics
+     * directly with the built-in key, else not set up. Requests show up in Settings → Web API
+     * requests (path and status only, never a key or token).
+     */
+    val lyrics = SpicyLyrics(
+        endpoints = {
+            buildList {
+                if (warehouse.supports(WarehouseFeature.Lyrics)) add(warehouse.lyrics)
+                if (spicyLyricsApi.isConfigured) add(spicyLyricsApi)
+            }
+        },
+        cache = lyricsCache,
+    )
+    val lyricsSource: LyricsSource = lyrics
+    val currentLyrics = CurrentLyrics(player, lyricsSource, settings.lyrics.value, scope)
 
     init {
         scope.launch(Dispatchers.IO) { lyricsCache.sweep() }

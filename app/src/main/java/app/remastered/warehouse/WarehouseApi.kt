@@ -23,6 +23,9 @@ import app.remastered.core.warehouse.WarehouseFeature
 import app.remastered.core.warehouse.WarehouseException.Problem
 import app.remastered.core.warehouse.Wrapped
 import app.remastered.core.warehouse.WrappedRange
+import app.remastered.core.lyrics.LyricsResult
+import app.remastered.spicylyrics.SpicyLyricsApi
+import app.remastered.spicylyrics.SpicyLyricsApi.Companion.retryAfterMs
 import app.remastered.spotify.web.await
 import java.io.IOException
 import java.time.LocalDate
@@ -34,6 +37,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -133,6 +137,66 @@ class WarehouseApi(
         get<WrappedDto>("api/wrapped") { range(from, to) }.toModel(from, to)
 
     /**
+     * Spicy Lyrics' answer for [trackId] through the warehouse's `GET /api/lyrics` (ADR 0005), which
+     * passes Spicy Lyrics' body on unchanged. Its own `404 {"error"}` (no route, or no key there)
+     * is [SpicyLyricsApi.Response.Unavailable] and marks [WarehouseFeature.Lyrics] missing; Spicy
+     * Lyrics' "no lyrics" `404` (a `Body` envelope) is a real answer. A rejected token is
+     * Unavailable too, so a built-in key can answer instead. Not retried: `Retry-After` is the
+     * caller's to honour. Never throws.
+     */
+    suspend fun lyrics(trackId: String): SpicyLyricsApi.Response = withContext(io) {
+        require(SpicyLyricsApi.isTrackId(trackId)) { "Not a Spotify track id" }
+        val path = WarehouseFeature.Lyrics.path
+        val cfg = config() ?: return@withContext SpicyLyricsApi.Response.Unavailable
+        val url = cfg.baseUrl.toHttpUrl().newBuilder().addPathSegments(path).addQueryParameter("track", trackId).build()
+        val request = Request.Builder().url(url)
+            .header("Authorization", "Bearer ${cfg.token}")
+            .header("Accept", "application/json")
+            .build()
+        try {
+            http.newCall(request).await().use { reply ->
+                val body = reply.body.string()
+                val ageMs = reply.header("Age")?.trim()?.toLongOrNull()?.takeIf { it >= 0 }?.times(1000) ?: 0
+                fun failed(problem: Problem, why: LyricsResult.Problem, retryAfterMs: Long? = null): SpicyLyricsApi.Response {
+                    onOutcome(path, WarehouseException(problem, "The warehouse answered ${reply.code}", reply.code))
+                    return SpicyLyricsApi.Response.Failed(why, retryAfterMs)
+                }
+                when (reply.code) {
+                    200 -> SpicyLyricsApi.Response.Body(body, ageMs).also { onOutcome(path, null) }
+                    404 -> if (isSpicyEnvelope(body)) {
+                        onOutcome(path, null)
+                        SpicyLyricsApi.Response.NotFound(ageMs)
+                    } else {
+                        onOutcome(path, WarehouseException(Problem.NotFound, "The warehouse doesn't serve lyrics", 404))
+                        SpicyLyricsApi.Response.Unavailable
+                    }
+                    401 -> {
+                        onOutcome(path, WarehouseException(Problem.Unauthorized, "The warehouse rejected the token", 401))
+                        SpicyLyricsApi.Response.Unavailable
+                    }
+                    429 -> failed(Problem.Busy, LyricsResult.Problem.RateLimited, reply.retryAfterMs())
+                    503 -> failed(Problem.ServerError, LyricsResult.Problem.ServiceDown, reply.retryAfterMs())
+                    400 -> failed(Problem.BadRequest, LyricsResult.Problem.BadResponse)
+                    // 502: Spicy Lyrics refused the warehouse's key, or failed.
+                    else -> failed(Problem.ServerError, LyricsResult.Problem.ServiceDown)
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            onOutcome(path, WarehouseException(Problem.Unreachable, "Can't reach the warehouse (${e.javaClass.simpleName})", cause = e))
+            SpicyLyricsApi.Response.Failed(LyricsResult.Problem.Offline)
+        }
+    }
+
+    /** Spicy Lyrics' own envelope (`{"Body": …}`), as opposed to the warehouse's `{"error": …}`. */
+    private fun isSpicyEnvelope(body: String): Boolean = try {
+        json.parseToJsonElement(body).let { it is JsonObject && "Body" in it }
+    } catch (_: Exception) {
+        false
+    }
+
+    /**
      * Whether this deployment serves [feature]: true or false, or null when the warehouse couldn't
      * be reached. Asks with parameters the warehouse rejects (400) before touching its database,
      * except for the ranges list and top songs (its cache key, a few rows), which are cheap.
@@ -147,6 +211,8 @@ class WarehouseApi(
                     // No query, and a region no deployment has: both refused before any database read.
                     WarehouseFeature.Search -> Unit
                     WarehouseFeature.Concerts -> add("region", "-")
+                    // No track: 400 where lyrics are on, 404 where they're off. Spicy Lyrics isn't asked.
+                    WarehouseFeature.Lyrics -> Unit
                     WarehouseFeature.ArtistHistory, WarehouseFeature.TrackHistory, WarehouseFeature.WrappedRanges, WarehouseFeature.Radio -> Unit
                 }
             }

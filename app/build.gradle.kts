@@ -10,8 +10,9 @@ plugins {
 // Spotify developer app settings live in client/local.properties (gitignored):
 //   spotify.clientId=…  spotify.redirectUri=…  spotify.clientSecret=… (optional)
 // Without them the app builds but shows a "not configured" screen.
-// Lyrics: spicylyrics.key=sl_pk_… (a publishable key with "No origin header" allowed). Without it
-// the app builds and says lyrics aren't set up.
+// Lyrics: optional. The app gets them through the user's warehouse when it serves /api/lyrics (its
+// own secret key, ADR 0005). spicylyrics.key=sl_pk_… (a publishable key with "No origin header"
+// allowed) adds Spicy Lyrics directly, for when it doesn't. With neither, lyrics aren't set up.
 val local = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.reader()?.use { load(it) }
 }
