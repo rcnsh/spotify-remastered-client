@@ -49,6 +49,11 @@ Where the client is. Tick tasks here in the same change that finishes them.
       restarts; 3 in flight and 20 per 30 s; Liked Songs paged on demand; Home tiles and
       Library kept on disk. Unit-tested; not yet verified on the phone (check once Spotify's
       pause from 2026-10-16 has passed).
+- [ ] Start radio from the history (warehouse `/api/radio`, music-warehouse PR #43): "Start
+      radio" in the track menu and a Radio chip on the artist page play the seed and queue
+      ~30 songs the user plays near it. Hidden until the Worker serves the route. Unit-tested;
+      on the phone, hidden as expected against the current Worker. Playback and queueing are
+      untested until the Worker is deployed.
 - [ ] App-owned Library folders and pins (ADR 0004).
 - [ ] Spike App Remote `getChildrenOfItem` for track lists of other people's playlists
       (ADR 0004, open question 2).
