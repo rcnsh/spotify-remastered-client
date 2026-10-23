@@ -49,6 +49,17 @@ Where the client is. Tick tasks here in the same change that finishes them.
       restarts; 3 in flight and 20 per 30 s; Liked Songs paged on demand; Home tiles and
       Library kept on disk. Unit-tested; not yet verified on the phone (check once Spotify's
       pause from 2026-10-16 has passed).
+- [x] Sleep timer: 5–60 minutes or end of song, from Now Playing (and the queue's footer, as in
+      the mockup); runs in the media notification's service (ADR 0007). Verified on the phone:
+      5 minutes paused Spotify with Remastered swiped from recents, End of song paused at 4:30 of
+      4:31; the notification shows when it pauses.
+- [ ] Home screen widget (RemoteViews): cover, title, artist, previous, play/pause, next, like;
+      idle state when Spotify isn't connected, a tap opens Now Playing. Idle state and tap checked
+      on an emulator; the playing state and buttons are not yet verified on the phone (add it from
+      the launcher's widget list).
+- [x] Launcher shortcuts: Now playing, Liked Songs, Search, and Wrapped (dynamic, while the
+      warehouse is usable). Verified on the phone: all four registered, and each one's intent
+      opens its screen (Wrapped from a cold start).
 - [ ] App-owned Library folders and pins (ADR 0004).
 - [ ] Spike App Remote `getChildrenOfItem` for track lists of other people's playlists
       (ADR 0004, open question 2).
