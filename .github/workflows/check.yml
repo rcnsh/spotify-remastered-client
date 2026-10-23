@@ -36,7 +36,8 @@ jobs:
   # A release APK signed with the release key, so it installs over the phone's build
   # (`adb install -r`). Pushes to main and manual runs only: secrets never reach pull requests. The repo is
   # public, so anyone signed in to GitHub can download the artifact: it carries only the
-  # public Spotify client id and the publishable lyrics key, never the client secret.
+  # public Spotify client id, never the client secret or a lyrics key (lyrics come through
+  # the warehouse, ADR 0005).
   apk:
     needs: check
     if: github.event_name != 'pull_request'
@@ -58,13 +59,11 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
-          SPICY_LYRICS_KEY: ${{ secrets.SPICY_LYRICS_KEY }}
         run: |
           printf '%s' "$RELEASE_KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
           {
             echo "spotify.clientId=$SPOTIFY_CLIENT_ID"
             echo "spotify.redirectUri=$SPOTIFY_REDIRECT_URI"
-            echo "spicylyrics.key=$SPICY_LYRICS_KEY"
             echo "release.storeFile=$RUNNER_TEMP/release.jks"
             echo "release.keyAlias=$RELEASE_KEY_ALIAS"
           } > local.properties
