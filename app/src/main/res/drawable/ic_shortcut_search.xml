@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut: Search (Icons.Search in Palette.accentLight on Palette.raised). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#FF2B3049" android:pathData="M0,24a24,24 0 1,0 48,0a24,24 0 1,0 -48,0z" />
+    <group android:translateX="12" android:translateY="12">
+        <path android:strokeColor="#FFA9B8FF" android:strokeWidth="2.4" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M4,11a7,7 0 1,0 14,0a7,7 0 1,0 -14,0M20.5,20.5l-4.3,-4.3" />
+    </group>
+</vector>

@@ -13,9 +13,11 @@ import app.remastered.core.Player
 import app.remastered.core.RecentSearches
 import app.remastered.core.RemoteContent
 import app.remastered.core.ScreenCache
+import app.remastered.core.SleepTimer
 import app.remastered.core.lyrics.CurrentLyrics
 import app.remastered.core.lyrics.LyricsSource
 import app.remastered.media.NowPlayingNotification
+import app.remastered.media.NowPlayingWidgets
 import app.remastered.spicylyrics.LyricsCache
 import app.remastered.spicylyrics.SpicyLyrics
 import app.remastered.spicylyrics.SpicyLyricsApi
@@ -46,8 +48,12 @@ class AppContainer(val context: Context) {
     /** Track lists of any playlist, from the Spotify app (App Remote); null pages while it isn't connected. */
     val content: RemoteContent = spotify.player
 
+    /** Pauses after a while or at the end of the song; run by the media notification's service. */
+    val sleepTimer = SleepTimer(clock)
     /** Remastered's own media notification while something plays (Settings → Playback). */
-    val nowPlaying = NowPlayingNotification(context, player, settings.mediaNotification.value, scope)
+    val nowPlaying = NowPlayingNotification(context, player, settings.mediaNotification.value, sleepTimer.mode, scope)
+    /** The home screen widget, kept in step with [player] while it's placed. */
+    val widgets = NowPlayingWidgets(context, spotify.player, scope)
 
     /**
      * Liked Songs, saved between runs so a start only fetches what's new. In files, not the cache:
@@ -86,9 +92,11 @@ class AppContainer(val context: Context) {
     init {
         scope.launch(Dispatchers.IO) { lyricsCache.sweep() }
         if (warehouse.isConfigured) scope.launch { warehouse.check() }
+        Shortcuts.follow(context, warehouse.state, scope)
     }
 
     fun close() {
+        sleepTimer.cancel()
         nowPlaying.stop()
         player.disconnect()
         scope.cancel()

@@ -33,7 +33,11 @@ Checked 2026-10-13 against the live API.
     `spicy_lyrics` responses, also the maker and uploader, linked. It is built from each
     response, never hardcoded (`Attribution.credit()`).
   - **Cached for under 30 days:** "no lyrics" answers for 1 day, swept at startup.
-  - **Shown only in the app:** no export or copy-out.
+  - **Shown only in the app:** no export or copy-out, with one exception (added 2026-10-23): a
+    share card, an image of one to four lines the user picks, with no timing data and the credit
+    printed on it. The terms (§5) forbid downloaders and handing out the response or sync data
+    to keep, and allow "a user selecting lyrics on screen"; a short quote image is our reading
+    of that line, not something the terms name, so drop the card if Spicy Lyrics objects.
   - **`Retry-After` is honoured.**
 - **Personal use only** (the user's call), so lyric rights clearance is out of scope.
 

@@ -32,6 +32,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.remastered.AppContainer
+import app.remastered.Launch
 import app.remastered.SpotifyServices
 import app.remastered.ui.components.fadeUp
 import app.remastered.ui.history.HistoryArtistScreen
@@ -45,6 +46,7 @@ import app.remastered.ui.player.DevicesSheet
 import app.remastered.ui.player.MiniPlayer
 import app.remastered.ui.player.NowPlaying
 import app.remastered.ui.player.QueueScreen
+import app.remastered.ui.player.SleepTimerSheet
 import app.remastered.ui.player.TrackMenuSheet
 import app.remastered.ui.screens.AlbumScreen
 import app.remastered.ui.screens.ArtistScreen
@@ -67,15 +69,15 @@ import app.remastered.ui.wrapped.WrappedStoryScreen
 /**
  * The whole UI for one [AppContainer]: sign-in if needed, then tabs, player and sheets.
  * [lyricsPreview] (debug builds only, see MainActivity) shows that track's lyrics preview first,
- * signed in or not; [wrappedPreview] likewise opens a Wrapped story. [openNowPlaying] is set when
- * the media notification is tapped.
+ * signed in or not; [wrappedPreview] likewise opens a Wrapped story. [launch] is where the media
+ * notification, the widget or a launcher shortcut asks to go.
  */
 @Composable
 fun RemasteredRoot(
     container: AppContainer,
     lyricsPreview: MutableState<String?>? = null,
     wrappedPreview: MutableState<WrappedPreview?>? = null,
-    openNowPlaying: MutableState<Boolean>? = null,
+    launch: MutableState<Launch?>? = null,
 ) {
     val context = LocalContext.current
     val spotify = container.spotify
@@ -100,14 +102,23 @@ fun RemasteredRoot(
     }
     val app = remember(container) { AppState(container, context.applicationContext) }
     LaunchedEffect(app) { app.start() }
-    LaunchedEffect(app, openNowPlaying?.value) {
-        if (openNowPlaying?.value != true) return@LaunchedEffect
-        openNowPlaying.value = false
-        if (container.player.state.value?.track == null) return@LaunchedEffect
+    LaunchedEffect(app, launch?.value) {
+        val to = launch?.value ?: return@LaunchedEffect
+        launch.value = null
         app.menu = null
-        app.queueOpen = false
-        app.lyricsOpen = false
-        app.nowPlayingOpen = true
+        app.sleepTimerOpen = false
+        when (to) {
+            Launch.NowPlaying -> {
+                if (container.player.state.value?.track == null) return@LaunchedEffect
+                app.queueOpen = false
+                app.lyricsOpen = false
+                app.nowPlayingOpen = true
+            }
+            Launch.LikedSongs -> { app.openTab(Tab.Library); app.open(Route.LikedSongs) }
+            Launch.Search -> app.openTab(Tab.Search)
+            // A shortcut pinned before the warehouse was turned off: Home instead.
+            Launch.Wrapped -> { app.openTab(Tab.Home); if (container.warehouse.state.value.isUsable) app.open(Route.Wrapped) }
+        }
     }
 
     BackHandler(enabled = app.canGoBack) { app.back() }
@@ -168,6 +179,7 @@ fun RemasteredRoot(
     app.menu?.let { TrackMenuSheet(app, it) }
     if (app.addToPlaylist != null) AddToPlaylistSheet(app)
     if (app.devicesOpen) DevicesSheet(app)
+    if (app.sleepTimerOpen) SleepTimerSheet(app)
 }
 
 /** A build without `spotify.clientId` in client/local.properties can't sign in or play. */

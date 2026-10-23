@@ -1,5 +1,6 @@
 package app.remastered.ui.components
 
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import app.remastered.spotify.remote.AppRemotePlayer
 import app.remastered.ui.theme.Icons
 import app.remastered.ui.theme.Palette
 import coil3.ImageLoader
+import coil3.SingletonImageLoader
 import coil3.asImage
 import coil3.compose.AsyncImage
 import coil3.decode.DataSource
@@ -32,6 +34,7 @@ import coil3.fetch.ImageFetchResult
 import coil3.key.Keyer
 import coil3.request.ImageRequest
 import coil3.request.Options
+import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +63,12 @@ class RemoteImageFetcher(private val data: RemoteImage, private val load: suspen
 private fun model(url: String): Any = when {
     url.startsWith(AppRemotePlayer.IMAGE_SCHEME) -> RemoteImage(url.removePrefix(AppRemotePlayer.IMAGE_SCHEME))
     else -> url
+}
+
+/** [url]'s artwork (https or App Remote) decoded to a software bitmap about [sizePx] across, for drawing on a Canvas. Null if it can't load. */
+suspend fun loadArtworkBitmap(context: Context, url: String, sizePx: Int): Bitmap? {
+    val request = ImageRequest.Builder(context).data(model(url)).size(sizePx).allowHardware(false).build()
+    return (SingletonImageLoader.get(context).execute(request) as? SuccessResult)?.image?.toBitmap()
 }
 
 /**

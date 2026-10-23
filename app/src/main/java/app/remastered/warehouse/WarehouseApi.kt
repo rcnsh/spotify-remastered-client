@@ -1,7 +1,9 @@
 package app.remastered.warehouse
 
 import app.remastered.core.warehouse.ArtistHistory
+import app.remastered.core.warehouse.Concerts
 import app.remastered.core.warehouse.DailyPlays
+import app.remastered.core.warehouse.HistorySearch
 import app.remastered.core.warehouse.Eras
 import app.remastered.core.warehouse.HomeFeed
 import app.remastered.core.warehouse.OnRepeat
@@ -12,6 +14,7 @@ import app.remastered.core.warehouse.Rhythm
 import app.remastered.core.warehouse.TopAlbums
 import app.remastered.core.warehouse.TopArtists
 import app.remastered.core.warehouse.TopOverTime
+import app.remastered.core.warehouse.TopTracks
 import app.remastered.core.warehouse.TrackHistory
 import app.remastered.core.warehouse.Warehouse
 import app.remastered.core.warehouse.WarehouseException
@@ -78,6 +81,10 @@ class WarehouseApi(
         get<TopArtistsDto>("api/top-artists") { range(from, to); add("tz", zone.id); add("limit", limit.coerceIn(1, 500)) }
             .toModel(from, to, zone.id)
 
+    override suspend fun topTracks(from: LocalDate, to: LocalDate, zone: ZoneId, limit: Int): TopTracks =
+        get<TopTracksDto>("api/top-tracks") { range(from, to); add("tz", zone.id); add("limit", limit.coerceIn(1, 500)) }
+            .toModel(from, to, zone.id)
+
     override suspend fun artist(id: String?, name: String?, zone: ZoneId): ArtistHistory {
         require(!id.isNullOrBlank() || !name.isNullOrBlank()) { "An artist needs an id or a name" }
         return get<ArtistHistoryDto>("api/artist") {
@@ -95,6 +102,14 @@ class WarehouseApi(
 
     override suspend fun home(zone: ZoneId): HomeFeed = get<HomeDto>("api/home") { add("tz", zone.id) }.toModel()
 
+    override suspend fun search(query: String, limit: Int): HistorySearch {
+        val q = query.trim().take(200)
+        require(q.isNotEmpty()) { "A search needs a query" }
+        return get<SearchDto>("api/search") { add("q", q); add("limit", limit.coerceIn(1, 50)) }.toModel(q)
+    }
+
+    override suspend fun concerts(): Concerts = get<ConcertsDto>("api/concerts").toModel()
+
     override suspend fun onRepeat(): OnRepeat = get<OnRepeatDto>("api/stats/on-repeat").toModel()
     override suspend fun rhythm(): Rhythm = get<RhythmDto>("api/stats/rhythm").toModel()
     override suspend fun topOverTime(): TopOverTime = get<TopOverTimeDto>("api/stats/top-over-time").toModel()
@@ -110,7 +125,7 @@ class WarehouseApi(
     /**
      * Whether this deployment serves [feature]: true or false, or null when the warehouse couldn't
      * be reached. Asks with parameters the warehouse rejects (400) before touching its database,
-     * except for the ranges list, which is cheap.
+     * except for the ranges list and top songs (its cache key, a few rows), which are cheap.
      */
     suspend fun serves(feature: WarehouseFeature): Boolean? = try {
         withContext(io) {
@@ -118,6 +133,10 @@ class WarehouseApi(
                 when (feature) {
                     WarehouseFeature.OnThisDay -> add("date", "-")
                     WarehouseFeature.Home -> add("tz", "-")
+                    WarehouseFeature.TopTracks -> add("from", "-")
+                    // No query, and a region no deployment has: both refused before any database read.
+                    WarehouseFeature.Search -> Unit
+                    WarehouseFeature.Concerts -> add("region", "-")
                     WarehouseFeature.ArtistHistory, WarehouseFeature.TrackHistory, WarehouseFeature.WrappedRanges -> Unit
                 }
             }

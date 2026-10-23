@@ -23,6 +23,21 @@ Where the client is. Tick tasks here in the same change that finishes them.
   - [x] Home ranked from the history (warehouse `/api/home`): shortcuts by frecency and
         time of day, Jump back in, Around this time, Rediscover; recently played as fallback.
         Verified on the phone: all four rows load, nothing repeats, a card opens its album
+  - [x] Stats for any range: presets (7 and 30 days, this month, last month, this year, 12
+        months) and a custom from–to, with top songs (warehouse `/api/top-tracks`, open to a read
+        token for any range; hidden on a warehouse without it) beside top artists. Verified on
+        the phone: last month's and a custom range's top songs load
+  - [x] Save as playlist: On repeat and a range's top songs become a private playlist (one
+        create and one add, up to 100 songs), named for the range, with "Open" in the snackbar.
+        Home's Rediscover is albums, playlists and artists, so it has none. Verified on the
+        phone with one test playlist, deleted afterwards
+  - [x] Concerts (warehouse `/api/concerts`): an "On tour" row on Home (date cards; a card opens
+        the artist page, or the ticket page for an artist without a Spotify id) and the artist's
+        upcoming gigs on the artist page (each opens its ticket page). Past and cancelled gigs
+        hidden; nothing shows without the route, on failure or with no gigs. Verified on the phone
+  - [x] Search "From your history" (warehouse `/api/search`): matching stored artists and songs
+        with play counts under Search's Top results, opening the History artist and track pages.
+        Verified on the phone
 - **Media notification** (ADR 0007): verified on the phone (card shows; play/pause, next,
   previous, like work; a tap opens Now Playing; controls keep working with Remastered
   swiped from recents; Spotify keeps playing with its own notification channel off).
@@ -49,6 +64,21 @@ Where the client is. Tick tasks here in the same change that finishes them.
       restarts; 3 in flight and 20 per 30 s; Liked Songs paged on demand; Home tiles and
       Library kept on disk. Unit-tested; not yet verified on the phone (check once Spotify's
       pause from 2026-10-16 has passed).
+- [x] Sleep timer: 5–60 minutes or end of song, from Now Playing (and the queue's footer, as in
+      the mockup); runs in the media notification's service (ADR 0007). Verified on the phone:
+      5 minutes paused Spotify with Remastered swiped from recents, End of song paused at 4:30 of
+      4:31; the notification shows when it pauses.
+- [ ] Home screen widget (RemoteViews): cover, title, artist, previous, play/pause, next, like;
+      idle state when Spotify isn't connected, a tap opens Now Playing. Idle state and tap checked
+      on an emulator; the playing state and buttons are not yet verified on the phone (add it from
+      the launcher's widget list).
+- [x] Launcher shortcuts: Now playing, Liked Songs, Search, and Wrapped (dynamic, while the
+      warehouse is usable). Verified on the phone: all four registered, and each one's intent
+      opens its screen (Wrapped from a cold start).
+- [x] Lyrics share card: in the full-screen lyrics, long-press a line, tap neighbours (up to
+      four), Share: a PNG of the lines over the artwork colour with art, title, artist and the
+      credit (ADR 0005), through the Wrapped share sheet. Verified on the emulator (preview) and
+      the phone (release build).
 - [x] App-owned Library folders and pins (ADR 0004), kept on the phone (`LibraryLayout`): long-press
       anything in Your Library to pin it or add it to a folder; + makes a playlist or a folder;
       folders open as their own list and can be pinned, renamed and deleted; pins and folder

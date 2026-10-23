@@ -43,3 +43,11 @@ Spotify's notification channel in system settings.
   Remastered next opens.
 - Still to verify on the phone: Spotify keeps playing reliably with its own notification channel
   off on Android 17.
+- The sleep timer (`core/SleepTimer`) runs in this service, the one thing that outlives the
+  window. While a timer is set the service runs even with the notification turned off in
+  Settings, and the notification says when it will pause. If the service isn't running when the
+  timer runs out (paused and swiped away), nothing pauses, and a pause missed by over a minute is
+  dropped rather than done late.
+- The home screen widget (`media/NowPlayingWidget`) shows the same player state but doesn't need
+  the service: the app pushes updates while its process lives, and the widget's buttons go to a
+  receiver that connects App Remote first if it has to.
