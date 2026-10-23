@@ -221,7 +221,8 @@ fun NowPlaying(app: AppState, modifier: Modifier = Modifier) {
     val lyricsOn by app.c.settings.lyrics.value.collectAsState()
     val showLyrics = lyricsOn && track != null
     // Never read here: a per-frame read would recompose the whole screen every frame. The lyrics
-    // card needs every frame while it's on screen; otherwise the seek bar only needs a pixel's worth.
+    // card needs every frame while any of it is on screen (onVisibilityChanged's default counts only
+    // all of it); otherwise the seek bar only needs a pixel's worth.
     var lyricsVisible by remember { mutableStateOf(false) }
     val position = rememberPosition(state, app.c.clock, if (showLyrics && lyricsVisible) 0 else progressStep(track?.durationMs ?: 0))
 
@@ -300,7 +301,7 @@ fun NowPlaying(app: AppState, modifier: Modifier = Modifier) {
                 }
             }
             if (showLyrics) UpNextCard(app, queue, tint, Modifier.padding(horizontal = 12.dp))
-            if (showLyrics) LyricsCard(app, position, tint, Modifier.onVisibilityChanged { lyricsVisible = it }.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 24.dp))
+            if (showLyrics) LyricsCard(app, position, tint, Modifier.onVisibilityChanged(minFractionVisible = .01f) { lyricsVisible = it }.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 24.dp))
         }
     }
 }

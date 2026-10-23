@@ -21,11 +21,47 @@ data class DayRange(val from: LocalDate, val to: LocalDate) {
     val days: Int get() = ChronoUnit.DAYS.between(from, to).toInt() + 1
 }
 
-/** The Stats chart's ranges; each ends today, today included. */
-enum class RangePreset(val label: String, val days: Int) {
-    Week("7 days", 7), Month("30 days", 30), Year("Year", 365);
+/**
+ * The Stats page's ranges. The rolling ones end today, today included; the calendar ones are a
+ * month or the year so far, or last month whole.
+ */
+enum class RangePreset(val label: String) {
+    Week("7 days"), Month("30 days"), ThisMonth("This month"), LastMonth("Last month"), ThisYear("This year"), Year("12 months");
 
-    fun resolve(today: LocalDate) = DayRange(today.minusDays(days - 1L), today)
+    fun resolve(today: LocalDate): DayRange = when (this) {
+        Week -> DayRange(today.minusDays(6), today)
+        Month -> DayRange(today.minusDays(29), today)
+        ThisMonth -> DayRange(today.withDayOfMonth(1), today)
+        LastMonth -> YearMonth.from(today).minusMonths(1).let { DayRange(it.atDay(1), it.atEndOfMonth()) }
+        ThisYear -> DayRange(today.withDayOfYear(1), today)
+        Year -> DayRange(today.minusDays(364), today)
+    }
+}
+
+private val RangeDay = DateTimeFormatter.ofPattern("d MMM")
+private val RangeDayYear = DateTimeFormatter.ofPattern("d MMM yyyy")
+
+/** "3 – 17 Oct 2026" style, compact enough for a chip. */
+fun rangeText(r: DayRange): String =
+    if (r.from.year == r.to.year) "${r.from.format(RangeDay)} – ${r.to.format(RangeDayYear)}" else "${r.from.format(RangeDayYear)} – ${r.to.format(RangeDayYear)}"
+
+/**
+ * A playlist name for [what] over [r]: "Top songs · October 2026" for a calendar month (or the
+ * month so far), "Top songs · 2026" for a year (or the year so far), the dates otherwise.
+ */
+fun rangePlaylistName(what: String, r: DayRange, today: LocalDate): String {
+    val month = YearMonth.from(r.from)
+    val year = r.from.year
+    // A range ending today covers a month or year that isn't over yet.
+    fun endsWith(end: LocalDate) = r.to == end || (r.to == today && end.isAfter(today))
+    val span = when {
+        r.from == month.atDay(1) && YearMonth.from(r.to) == month && endsWith(month.atEndOfMonth()) ->
+            month.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+        r.from.dayOfYear == 1 && r.to.year == year && endsWith(LocalDate.of(year, 12, 31)) -> "$year"
+        r.from == r.to -> r.from.format(RangeDayYear)
+        else -> rangeText(r)
+    }
+    return "$what · $span"
 }
 
 /**

@@ -26,6 +26,28 @@ class StatsMathTest {
         assertEquals(LocalDate.of(2027, 3, 2), RangePreset.Year.resolve(LocalDate.of(2028, 2, 29)).from)
     }
 
+    @Test fun `calendar presets are this month and year so far, and last month whole`() {
+        assertEquals(DayRange(LocalDate.of(2026, 10, 1), today), RangePreset.ThisMonth.resolve(today))
+        assertEquals(DayRange(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)), RangePreset.LastMonth.resolve(today))
+        assertEquals(DayRange(LocalDate.of(2026, 1, 1), today), RangePreset.ThisYear.resolve(today))
+        // January's last month is last year's December; the first of a month is a one-day month so far.
+        assertEquals(DayRange(LocalDate.of(2025, 12, 1), LocalDate.of(2025, 12, 31)), RangePreset.LastMonth.resolve(LocalDate.of(2026, 1, 1)))
+        assertEquals(1, RangePreset.ThisMonth.resolve(LocalDate.of(2026, 1, 1)).days)
+    }
+
+    @Test fun `playlist names say the month or year when the range is one`() {
+        fun name(from: LocalDate, to: LocalDate) = rangePlaylistName("Top songs", DayRange(from, to), today)
+        assertEquals("Top songs · September 2026", name(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
+        assertEquals("Top songs · October 2026", name(LocalDate.of(2026, 10, 1), today))
+        assertEquals("Top songs · 2026", name(LocalDate.of(2026, 1, 1), today))
+        assertEquals("Top songs · 2025", name(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31)))
+        assertEquals("Top songs · 13 Oct 2026", name(today, today))
+        assertEquals("Top songs · 3 Aug – 13 Oct 2026", name(LocalDate.of(2026, 8, 3), today))
+        // Part of a finished month is just dates.
+        assertEquals("Top songs · 1 Aug – 20 Aug 2026", name(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 20)))
+        assertEquals("Top songs · 1 Dec 2025 – 13 Oct 2026", name(LocalDate.of(2025, 12, 1), today))
+    }
+
     @Test fun `custom ranges are put in order, end by today and stay under the warehouse limit`() {
         assertEquals(DayRange(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1)),
             customRange(LocalDate.of(2026, 2, 1), LocalDate.of(2026, 1, 1), today))
