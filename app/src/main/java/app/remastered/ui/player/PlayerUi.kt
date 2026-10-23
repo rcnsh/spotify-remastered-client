@@ -289,6 +289,7 @@ fun NowPlaying(app: AppState, modifier: Modifier = Modifier) {
                             Text("Devices", style = Type.label, color = Palette.accentLight, modifier = Modifier.padding(start = 8.dp))
                         }
                         Spacer(Modifier.weight(1f))
+                        SleepTimerButton(app)
                         IconButton(Icons.Share, "Share", { app.share(track.uri, track.name) }, tint = Color.White.copy(alpha = .8f), iconSize = 20.dp)
                         IconButton(Icons.Queue, "Queue", { app.queueOpen = true }, tint = Color.White.copy(alpha = .8f), iconSize = 20.dp)
                     }
@@ -371,6 +372,8 @@ fun QueueScreen(app: AppState, modifier: Modifier = Modifier) {
             QueueToggle(if (st?.repeat == RepeatMode.One) Icons.RepeatOne else Icons.Repeat, "Repeat", st?.repeat != RepeatMode.Off && st != null) {
                 st?.let { app.c.player.setRepeat(it.repeat.next()) }
             }
+            val sleep by app.c.sleepTimer.mode.collectAsState()
+            QueueToggle(Icons.Moon, "Sleep timer", sleep != null) { app.sleepTimerOpen = true }
         }
     }
 }

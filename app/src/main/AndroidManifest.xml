@@ -38,11 +38,28 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="app.remastered" android:host="warehouse-auth" />
             </intent-filter>
+            <!-- Launcher shortcuts: Now playing, Liked Songs, Search (Wrapped is added at run time). -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
         <service
             android:name=".media.NowPlayingService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <!-- The home screen widget; its buttons go to the unexported receiver below. -->
+        <receiver
+            android:name=".media.NowPlayingWidget"
+            android:exported="true"
+            android:label="Now playing">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/now_playing_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".media.NowPlayingWidgetCommands"
+            android:exported="false" />
         <!-- Share images (cache/wrapped/*.png: Wrapped and lyrics cards), handed to the share sheet. -->
         <provider
             android:name="androidx.core.content.FileProvider"

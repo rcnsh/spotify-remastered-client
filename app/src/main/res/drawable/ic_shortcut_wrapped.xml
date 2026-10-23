@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut: Wrapped (a sparkle in Palette.accentLight on Palette.raised). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#FF2B3049" android:pathData="M0,24a24,24 0 1,0 48,0a24,24 0 1,0 -48,0z" />
+    <group android:translateX="12" android:translateY="12">
+        <path android:fillColor="#FFA9B8FF" android:pathData="M12 2.5l2.4 7.1 7.1 2.4-7.1 2.4-2.4 7.1-2.4-7.1-7.1-2.4 7.1-2.4z" />
+    </group>
+</vector>

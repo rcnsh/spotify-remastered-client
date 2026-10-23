@@ -13,6 +13,8 @@ import android.graphics.Bitmap
 import android.media.MediaMetadata
 import android.media.session.MediaSession
 import android.media.session.PlaybackState as SessionState
+import android.os.SystemClock
+import android.text.format.DateFormat
 import android.util.Log
 import app.remastered.MainActivity
 import app.remastered.R
@@ -20,19 +22,18 @@ import app.remastered.RemasteredApp
 import app.remastered.core.Connection
 import app.remastered.core.NowPlaying
 import app.remastered.core.PlaybackState
+import app.remastered.core.SleepTimer
 import app.remastered.spotify.remote.AppRemotePlayer
-import coil3.SingletonImageLoader
-import coil3.request.ImageRequest
-import coil3.request.SuccessResult
-import coil3.request.allowHardware
-import coil3.size.Size
-import coil3.toBitmap
+import java.util.Date
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 /**
@@ -51,6 +52,7 @@ class NowPlayingService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var session: MediaSession
     private var player: AppRemotePlayer? = null
+    private var sleepTimer: SleepTimer? = null
     private var foreground = false
     private var shownUri: String? = null
     /** Artwork for the current track's image url, once loaded. */
@@ -77,7 +79,9 @@ class NowPlayingService : Service() {
             setCallback(callback)
             isActive = true
         }
-        player = (application as RemasteredApp).container?.spotify?.player
+        val container = (application as RemasteredApp).container
+        player = container?.spotify?.player
+        sleepTimer = container?.sleepTimer
         // Started with startForegroundService: it has to go foreground now, whatever the state.
         goForeground(build(player?.state?.value))
         val p = player ?: return stopSelf()
@@ -87,6 +91,7 @@ class NowPlayingService : Service() {
             p.connect()
             scope.launch { delay(CONNECT_TIMEOUT_MS); if (p.state.value?.track == null) stopSelf() }
         }
+        sleepTimer?.let { timer -> runSleepTimer(p, timer) }
         scope.launch {
             p.connection.collect { c ->
                 reconnect?.cancel()
@@ -116,6 +121,36 @@ class NowPlayingService : Service() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
         super.onDestroy()
+    }
+
+    /**
+     * Runs the sleep timer here rather than in the activity, so it pauses with no window open.
+     * Rechecks on every change of the timer or the playback state (a seek, a skip, a pause).
+     */
+    private fun runSleepTimer(p: AppRemotePlayer, timer: SleepTimer) {
+        scope.launch {
+            combine(timer.mode, p.state) { _, s -> s }.collectLatest { s ->
+                while (true) {
+                    when (val step = timer.step(s)) {
+                        SleepTimer.Step.Idle -> break
+                        SleepTimer.Step.Pause -> { p.pause(); break }
+                        is SleepTimer.Step.Wait -> delay(step.ms)
+                    }
+                }
+            }
+        }
+        // The notification says when it pauses.
+        scope.launch { timer.mode.drop(1).collect { update(p.state.value) } }
+    }
+
+    /** "Sleep timer · 23:15" or "Sleep timer · end of song", or null while it's off. */
+    private fun sleepText(): String? = when (val m = sleepTimer?.mode?.value) {
+        null -> null
+        SleepTimer.Mode.EndOfTrack -> "Sleep timer · end of ${if (player?.state?.value?.track?.isEpisode == true) "episode" else "song"}"
+        is SleepTimer.Mode.After -> {
+            val at = System.currentTimeMillis() + (m.atMs - SystemClock.elapsedRealtime())
+            "Sleep timer · ${DateFormat.getTimeFormat(this).format(Date(at))}"
+        }
     }
 
     private fun toggleLike() {
@@ -207,11 +242,7 @@ class NowPlayingService : Service() {
         val url = track.imageUrl ?: return
         if (art?.first == url) return
         artJob = scope.launch {
-            val bmp = if (url.startsWith(AppRemotePlayer.IMAGE_SCHEME)) player?.image(url.removePrefix(AppRemotePlayer.IMAGE_SCHEME), large = false)
-            else (SingletonImageLoader.get(this@NowPlayingService).execute(
-                ImageRequest.Builder(this@NowPlayingService).data(url).size(Size(ART_PX, ART_PX)).allowHardware(false).build(),
-            ) as? SuccessResult)?.image?.toBitmap()
-            art = url to bmp
+            art = url to loadArtwork(this@NowPlayingService, player, url, ART_PX)
             update(player?.state?.value)
         }
     }
@@ -230,6 +261,7 @@ class NowPlayingService : Service() {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setCategory(Notification.CATEGORY_TRANSPORT)
             .setOngoing(playing)
+            .setSubText(sleepText())
             .setShowWhen(false)
             .setOnlyAlertOnce(true)
         // Before Android 13 these buttons are what the notification shows; since, the system

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcuts (long-press the icon). MainActivity routes their actions (Shortcuts.kt);
+     Wrapped is added at run time, only while the warehouse is set up. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:icon="@drawable/ic_shortcut_now_playing"
+        android:shortcutId="now_playing"
+        android:shortcutShortLabel="@string/shortcut_now_playing">
+        <intent
+            android:action="app.remastered.OPEN_NOW_PLAYING"
+            android:targetClass="app.remastered.MainActivity"
+            android:targetPackage="app.remastered" />
+    </shortcut>
+    <shortcut
+        android:icon="@drawable/ic_shortcut_liked"
+        android:shortcutId="liked_songs"
+        android:shortcutShortLabel="@string/shortcut_liked">
+        <intent
+            android:action="app.remastered.OPEN_LIKED_SONGS"
+            android:targetClass="app.remastered.MainActivity"
+            android:targetPackage="app.remastered" />
+    </shortcut>
+    <shortcut
+        android:icon="@drawable/ic_shortcut_search"
+        android:shortcutId="search"
+        android:shortcutShortLabel="@string/shortcut_search">
+        <intent
+            android:action="app.remastered.OPEN_SEARCH"
+            android:targetClass="app.remastered.MainActivity"
+            android:targetPackage="app.remastered" />
+    </shortcut>
+</shortcuts>

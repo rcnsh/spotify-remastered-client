@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The home screen widget (media/NowPlayingWidget): cover, title, artist, and the controls. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="12dp">
+
+    <FrameLayout
+        android:layout_width="84dp"
+        android:layout_height="84dp">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/widget_art_background"
+            android:importantForAccessibility="no"
+            android:scaleType="center"
+            android:src="@drawable/ic_widget_note" />
+
+        <ImageView
+            android:id="@+id/widget_art"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/widget_art_background"
+            android:clipToOutline="true"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:text="Not playing"
+            android:textColor="#FFF3F4F8"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/widget_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#FFA3A9BF"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/widget_previous"
+                style="@style/WidgetButton"
+                android:contentDescription="Previous"
+                android:src="@drawable/ic_media_previous" />
+
+            <ImageButton
+                android:id="@+id/widget_play"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginHorizontal="6dp"
+                android:background="@drawable/widget_play_background"
+                android:contentDescription="Play"
+                android:padding="11dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_media_play"
+                android:tint="#FF1E2233" />
+
+            <ImageButton
+                android:id="@+id/widget_next"
+                style="@style/WidgetButton"
+                android:contentDescription="Next"
+                android:src="@drawable/ic_media_next" />
+
+            <!-- A spacer: RemoteViews doesn't allow a plain View. -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <ImageButton
+                android:id="@+id/widget_like"
+                style="@style/WidgetButton"
+                android:contentDescription="Add to Liked Songs"
+                android:src="@drawable/ic_media_heart" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
