@@ -64,6 +64,11 @@ Where the client is. Tick tasks here in the same change that finishes them.
       restarts; 3 in flight and 20 per 30 s; Liked Songs paged on demand; Home tiles and
       Library kept on disk. Unit-tested; not yet verified on the phone (check once Spotify's
       pause from 2026-10-16 has passed).
+- [ ] Start radio from the history (warehouse `/api/radio`, music-warehouse PR #43): "Start
+      radio" in the track menu and a Radio chip on the artist page play the seed and queue
+      ~30 songs the user plays near it. Hidden until the Worker serves the route. Unit-tested;
+      on the phone, hidden as expected against the current Worker. Playback and queueing are
+      untested until the Worker is deployed.
 - [x] Sleep timer: 5–60 minutes or end of song, from Now Playing (and the queue's footer, as in
       the mockup); runs in the media notification's service (ADR 0007). Verified on the phone:
       5 minutes paused Spotify with Remastered swiped from recents, End of song paused at 4:30 of
