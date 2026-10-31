@@ -112,7 +112,7 @@ class WarehouseSignIn(
 
     companion object {
         const val SCHEME = "app.remastered"
-        /** Not `callback`: that host belongs to Spotify's auth AAR (the Web API login). */
+        /** Not `callback`: that host is the Web API login's redirect uri (spotify/auth). */
         const val HOST = "warehouse-auth"
         const val RETURN_TO = "$SCHEME://$HOST"
         /** The warehouse forgets a login after 10 minutes. */

@@ -57,10 +57,9 @@ android {
         buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"$redirectUri\"")
         buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"${localProp("spotify.clientSecret")}\"")
         buildConfigField("String", "SPICY_LYRICS_KEY", "\"$spicyLyricsKey\"")
-        // Spotify's auth AAR registers its callback activity for the redirect URI.
+        // MainActivity's intent filter for the sign-in redirect (and the auth AAR's manifest, which needs them).
         manifestPlaceholders["redirectSchemeName"] = redirect.scheme
         manifestPlaceholders["redirectHostName"] = redirect.host
-        manifestPlaceholders["redirectPathPattern"] = ".*"
     }
 
     buildFeatures {

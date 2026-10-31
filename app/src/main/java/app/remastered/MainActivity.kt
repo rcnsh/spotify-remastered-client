@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) launch.value = Launch.of(intent?.action)
         // Not again when recreated (rotation): the intent is the same, and its code is spent.
         if (savedInstanceState == null) handleWarehouseSignIn(intent)
+        if (savedInstanceState == null) handleSpotifySignIn(intent)
         // Debug builds only: `adb shell am start -n app.remastered/.MainActivity --es lyrics_preview spotify:track:…`
         // opens that track's lyrics on a local clock, for checking the lyrics view without Spotify.
         val lyricsPreview = mutableStateOf(intent.getStringExtra(EXTRA_LYRICS_PREVIEW)?.takeIf { BuildConfig.DEBUG && it.startsWith("spotify:track:") })
@@ -64,6 +65,18 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         Launch.of(intent.action)?.let { launch.value = it }
         handleWarehouseSignIn(intent)
+        handleSpotifySignIn(intent)
+    }
+
+    /**
+     * Spotify's sign-in page sending the browser back (app.remastered://callback?code=…): trade the
+     * code for tokens in the container's scope, so it outlives this activity. The sign-in screen
+     * shows a failure.
+     */
+    private fun handleSpotifySignIn(intent: Intent?) {
+        val container = (application as RemasteredApp).container ?: return
+        val uri = intent?.data?.toString()?.takeIf { intent.action == Intent.ACTION_VIEW && container.spotify.isLoginRedirect(it) } ?: return
+        container.scope.launch { container.spotify.finishLogin(uri) }
     }
 
     /**

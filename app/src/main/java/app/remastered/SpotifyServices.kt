@@ -1,8 +1,6 @@
 package app.remastered
 
-import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,17 +45,35 @@ class SpotifyServices(context: Context, scope: CoroutineScope, clock: () -> Long
     var signedIn by mutableStateOf(auth.isSignedIn)
         private set
 
-    fun loginIntent(activity: Activity): Intent = auth.loginIntent(activity)
+    /** While the code from the browser is being traded for tokens. */
+    var finishingLogin by mutableStateOf(false)
+        private set
+    /** Why the last sign-in failed, for the sign-in screen; null after a success or a new attempt. */
+    var loginError by mutableStateOf<String?>(null)
 
-    /** Finishes sign-in from the auth activity's result. Returns an error message, or null on success. */
-    suspend fun finishLogin(resultCode: Int, data: Intent?): String? {
-        val result = auth.handleResult(resultCode, data)
+    /** Spotify's sign-in page, to open in the browser; it comes back through [finishLogin]. */
+    fun loginUrl(): String {
+        loginError = null
+        return auth.loginUrl().toString()
+    }
+
+    fun isLoginRedirect(uri: String?): Boolean = auth.isRedirect(uri)
+
+    /** Finishes sign-in from the browser's [redirect]; failures land in [loginError]. A repeat while one runs is ignored. */
+    suspend fun finishLogin(redirect: String) {
+        if (finishingLogin) return
+        finishingLogin = true
+        val result = try {
+            auth.handleRedirect(redirect)
+        } finally {
+            finishingLogin = false
+        }
         signedIn = auth.isSignedIn
-        val e = result.exceptionOrNull() ?: return null
+        val e = result.exceptionOrNull() ?: return
         // Error codes only: never log the response itself, it may carry a code or token.
         Log.w("SpotifyServices", "Sign-in failed: ${e.javaClass.simpleName} ${(e as? AuthException)?.let { "status=${it.status} error=${it.error}" }.orEmpty()}")
         val detail = (e as? AuthException)?.takeIf { it.status != null }?.let { " (HTTP ${it.status}${it.error?.let { err -> ", $err" }.orEmpty()})" }.orEmpty()
-        return (e.message ?: "Sign-in failed.") + detail
+        loginError = (e.message ?: "Sign-in failed.") + detail
     }
 
     fun signOut() {
