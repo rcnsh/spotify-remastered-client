@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -21,6 +22,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # A version tag must be on main and match the app's versionName, so the release's APK
+      # says what it is. Checked first so a wrong tag fails in seconds.
+      - name: Tag is on main and matches versionName
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          on_main=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_SHA" --jq .status)
+          if [ "$on_main" != identical ] && [ "$on_main" != behind ]; then
+            echo "::error::tag $GITHUB_REF_NAME is not on main"
+            exit 1
+          fi
+          have=$(sed -n 's/^ *versionName = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          if [ "$have" != "${GITHUB_REF_NAME#v}" ]; then
+            echo "::error::tag $GITHUB_REF_NAME, but versionName is $have"
+            exit 1
+          fi
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -34,7 +52,7 @@ jobs:
       - run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 
   # A release APK signed with the release key, so it installs over the phone's build
-  # (`adb install -r`). Pushes to main and manual runs only: secrets never reach pull requests. The repo is
+  # (`adb install -r`). Pushes to main, v* tags and manual runs only: secrets never reach pull requests. The repo is
   # public, so anyone signed in to GitHub can download the artifact: it carries only the
   # public Spotify client id, never the client secret or a lyrics key (lyrics come through
   # the warehouse, ADR 0005).
@@ -79,3 +97,32 @@ jobs:
           retention-days: 30
       - if: always()
         run: rm -f "$RUNNER_TEMP/release.jks" local.properties
+
+  # A v* tag publishes a GitHub release with the signed APK (bump versionName and versionCode,
+  # then tag). Tags with a hyphen (v0.2.0-rc1) are marked pre-release. A rerun replaces the APK.
+  release:
+    needs: apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: remastered-${{ github.sha }}
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          apk="spotify-remastered-$TAG.apk"
+          mv app-release.apk "$apk"
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$apk" -R "$GITHUB_REPOSITORY" --clobber
+            exit 0
+          fi
+          pre=()
+          case "$TAG" in *-*) pre=(--prerelease) ;; esac
+          gh release create "$TAG" "$apk" -R "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" \
+            --generate-notes --notes "SHA-256 of the APK: \`$(sha256sum "$apk" | cut -d' ' -f1)\`" "${pre[@]}"

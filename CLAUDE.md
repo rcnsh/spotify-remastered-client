@@ -82,7 +82,8 @@ scripts/fetch-spotify-sdk.sh
 ./gradlew :app:testDebugUnitTest :app:installDebug
 ./gradlew :app:assembleRelease            # minified; signed if release.storeFile is set, else unsigned
 ./gradlew :app:installProfile             # release code, debug key: installs over debug; use for perf
-gh run download -R rcnsh/spotify-remastered-client -n remastered-<sha>   # CI's signed release APK (main, or a manual run)
+gh run download -R rcnsh/spotify-remastered-client -n remastered-<sha>   # CI's signed release APK (main, a v* tag, or a manual run)
+git tag v<versionName> && git push origin v<versionName>   # bump versionName and versionCode first: CI publishes a GitHub release with the signed APK
 adb shell dumpsys gfxinfo app.remastered reset   # then ... gfxinfo app.remastered: frame stats
 
 # Debug previews (no sign-in needed, work on the emulator)

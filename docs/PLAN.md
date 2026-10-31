@@ -104,8 +104,6 @@ Where the client is. Tick tasks here in the same change that finishes them.
 - [ ] Spotify's own playlists (Today's Top Hits …) still can't open: the Web API answers 404 for
       the playlist itself, so the screen has no header. App Remote can list their tracks; a
       header from elsewhere (search result, or the uri alone) would make them work.
-
-## Deferred
-- Release signing: release builds compile but are unsigned; the phone runs the debug build
-  (debug key), which is fine for now. Switching keys means an uninstall (which logs Spotify
-  out of the client).
+- [ ] Releases from version tags: pushing `v<versionName>` (after bumping `versionName` and
+      `versionCode`) makes CI publish a GitHub release with the signed APK; a hyphenated tag is a
+      pre-release. A tag that isn't on main or doesn't match `versionName` fails first.
