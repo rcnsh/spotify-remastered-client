@@ -1,8 +1,10 @@
 package app.remastered.ui
 
-import androidx.activity.compose.LocalActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsClient
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -38,10 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +51,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -59,21 +59,13 @@ import app.remastered.SpotifyServices
 import app.remastered.ui.components.EqBars
 import app.remastered.ui.theme.Palette
 import app.remastered.ui.theme.Type
-import kotlinx.coroutines.launch
 
-/** First run in Spotify mode: Web API sign-in (PKCE, through Spotify's auth screen). */
+/** First run in Spotify mode: Web API sign-in (PKCE, on Spotify's page in the browser; see SpotifyAuth). */
 @Composable
 fun SignInScreen(spotify: SpotifyServices) {
-    val activity = LocalActivity.current
-    val scope = rememberCoroutineScope()
-    var error by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        scope.launch {
-            error = spotify.finishLogin(result.resultCode, result.data)
-            busy = false
-        }
-    }
+    val context = LocalContext.current
+    val error = spotify.loginError
+    val busy = spotify.finishingLogin
 
     // Content rises in once, after the mosaic is already moving.
     val enter = remember { Animatable(0f) }
@@ -99,16 +91,26 @@ fun SignInScreen(spotify: SpotifyServices) {
             }
 
             PrimaryButton("Continue with Spotify", busy = busy, modifier = Modifier.padding(top = 28.dp)) {
-                if (activity != null) {
-                    error = null
-                    busy = true
-                    launcher.launch(spotify.loginIntent(activity))
-                }
+                openLogin(context, spotify)
             }
             Text("You sign in on Spotify's own page. Playback goes through the Spotify app on this phone.",
                 style = Type.caption, color = Palette.dim, textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(top = 18.dp, start = 12.dp, end = 12.dp))
         }
+    }
+}
+
+/**
+ * Spotify's sign-in page in a Custom Tab of the browser, never an app that claims the link: the
+ * Spotify app would take the login and drop the code challenge. MainActivity gets the redirect.
+ */
+private fun openLogin(context: Context, spotify: SpotifyServices) {
+    val tab = CustomTabsIntent.Builder().setShowTitle(true).build()
+    CustomTabsClient.getPackageName(context, emptyList())?.let { tab.intent.setPackage(it) }
+    try {
+        tab.launchUrl(context, Uri.parse(spotify.loginUrl()))
+    } catch (_: ActivityNotFoundException) {
+        spotify.loginError = "No browser to sign in with."
     }
 }
 

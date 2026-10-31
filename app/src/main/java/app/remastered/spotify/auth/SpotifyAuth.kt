@@ -1,21 +1,22 @@
 package app.remastered.spotify.auth
 
-import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import app.remastered.spotify.web.TokenProvider
-import com.spotify.sdk.android.auth.AuthorizationClient
-import com.spotify.sdk.android.auth.AuthorizationRequest
-import com.spotify.sdk.android.auth.AuthorizationResponse
+import java.net.URI
 import java.security.SecureRandom
 import kotlin.coroutines.cancellation.CancellationException
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 
 /**
- * Sign-in via Spotify's auth library: authorization-code flow with PKCE, tokens in [store].
+ * Sign-in to the Web API: authorization code with PKCE in the browser, tokens in [store].
  *
- * Usage: launch [loginIntent] with an activity-result launcher, pass the result to [handleResult],
- * then build `WebCatalog(http, auth.tokenProvider)`.
+ * [loginUrl] keeps a verifier and state in [store] (the process may die while the browser is in
+ * front) and returns Spotify's authorize page for a Custom Tab; Spotify sends the browser back to
+ * [redirectUri], and [handleRedirect] trades the code. Not Spotify's auth library: it hands the
+ * login to the Spotify app when it can, which drops the code challenge, and the exchange then
+ * needs the client secret, which a published APK can't carry.
  */
 class SpotifyAuth(
     private val clientId: String,
@@ -23,44 +24,49 @@ class SpotifyAuth(
     private val store: TokenStore,
     private val tokenClient: TokenClient,
     private val scopes: List<String> = SCOPES,
+    private val random: SecureRandom = SecureRandom(),
 ) {
     val tokenProvider: TokenProvider = StoredTokenProvider(store, tokenClient)
 
     val isSignedIn get() = store.load() != null
 
-    fun loginIntent(activity: Activity): Intent {
-        val random = SecureRandom()
+    fun loginUrl(): HttpUrl {
         val pending = PendingLogin(Pkce.verifier(random), Pkce.verifier(random).take(32))
-        // Persisted before launch: the process may die while the login UI is in front.
+        // Persisted before launch: the process may die while the browser is in front.
         store.savePendingLogin(pending)
-        val request = AuthorizationRequest.Builder(clientId, AuthorizationResponse.Type.CODE, redirectUri)
-            .setScopes(scopes.toTypedArray())
-            .setState(pending.state)
-            .setCustomParam("code_challenge", Pkce.challenge(pending.verifier))
-            .setCustomParam("code_challenge_method", "S256")
+        return AUTHORIZE_URL.toHttpUrl().newBuilder()
+            .addQueryParameter("client_id", clientId)
+            .addQueryParameter("response_type", "code")
+            .addQueryParameter("redirect_uri", redirectUri)
+            .addQueryParameter("state", pending.state)
+            .addQueryParameter("scope", scopes.joinToString(" "))
+            .addQueryParameter("code_challenge_method", "S256")
+            .addQueryParameter("code_challenge", Pkce.challenge(pending.verifier))
             .build()
-        return AuthorizationClient.createLoginActivityIntent(activity, request)
     }
 
-    suspend fun handleResult(resultCode: Int, data: Intent?): Result<Tokens> {
+    /** True for Spotify sending the browser back to [redirectUri] (any query). */
+    fun isRedirect(uri: String?): Boolean {
+        val ours = parse(redirectUri) ?: return false
+        val parsed = uri?.let(::parse) ?: return false
+        return parsed.scheme.equals(ours.scheme, ignoreCase = true) && parsed.host.equals(ours.host, ignoreCase = true)
+    }
+
+    /** Finishes the login [redirect] belongs to. The pending login is used up either way. */
+    suspend fun handleRedirect(redirect: String): Result<Tokens> {
         val pending = store.pendingLogin()
         return try {
-            val response = AuthorizationClient.getResponse(resultCode, data)
-            when (response.type) {
-                AuthorizationResponse.Type.CODE -> {
-                    pending ?: throw AuthException("No login in progress")
-                    // Spotify echoes state on both the browser and app paths; reject a mismatch.
-                    if (response.state != null && response.state != pending.state) {
-                        throw AuthException("Login state mismatch")
-                    }
-                    val tokens = tokenClient.exchange(response.code, pending.verifier)
-                    store.save(tokens)
-                    Result.success(tokens)
-                }
-                AuthorizationResponse.Type.ERROR -> throw AuthException("Spotify login failed (${response.error ?: "no error code"})", null, response.error)
-                AuthorizationResponse.Type.EMPTY -> throw AuthException("Login cancelled", null, "cancelled")
-                else -> throw AuthException("Unexpected login response: ${response.type}")
+            val params = query(redirect)
+            params["error"]?.let { error ->
+                if (error == "access_denied") throw AuthException("Login cancelled", null, "cancelled")
+                throw AuthException("Spotify login failed ($error)", null, error)
             }
+            val code = params["code"]?.takeIf { it.isNotBlank() } ?: throw AuthException("Spotify sent no code")
+            pending ?: throw AuthException("No login in progress")
+            if (params["state"] != pending.state) throw AuthException("Login state mismatch")
+            val tokens = tokenClient.exchange(code, pending.verifier)
+            store.save(tokens)
+            Result.success(tokens)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -84,6 +90,8 @@ class SpotifyAuth(
     }
 
     companion object {
+        const val AUTHORIZE_URL = "https://accounts.spotify.com/authorize"
+
         val SCOPES = listOf(
             "user-read-playback-state", "user-modify-playback-state", "user-read-currently-playing",
             "user-read-recently-played", "user-top-read", "user-library-read", "user-library-modify",
@@ -100,5 +108,15 @@ class SpotifyAuth(
                 store = PrefsTokenStore(context),
                 tokenClient = TokenClient(http, clientId, redirectUri, clientSecret),
             )
+
+        private fun parse(uri: String): URI? = try { URI(uri) } catch (_: Exception) { null }
+
+        private fun query(uri: String): Map<String, String> =
+            parse(uri)?.rawQuery.orEmpty().split('&').filter { it.isNotEmpty() }.associate {
+                val (k, v) = (it.split('=', limit = 2) + "").take(2)
+                decode(k) to decode(v)
+            }
+
+        private fun decode(s: String) = try { java.net.URLDecoder.decode(s, "UTF-8") } catch (_: Exception) { s }
     }
 }

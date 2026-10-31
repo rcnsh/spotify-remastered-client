@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- The media notification (media/NowPlayingService) runs in the foreground while playing. -->
@@ -9,6 +10,10 @@
     <!-- Settings shows the installed Spotify app's version and can open it. -->
     <queries>
         <package android:name="com.spotify.music" />
+        <!-- Sign-in opens in the browser's Custom Tab (ui/SignInScreen). -->
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
     </queries>
 
     <application
@@ -30,8 +35,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Spotify's sign-in page (spotify/auth/SpotifyAuth) returns here: the redirect uri. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${redirectSchemeName}" android:host="${redirectHostName}" />
+            </intent-filter>
             <!-- music-warehouse "Sign in with Spotify" (warehouse/WarehouseSignIn) returns here. Host
-                 warehouse-auth, not callback: Spotify's auth AAR owns app.remastered://callback. -->
+                 warehouse-auth, not callback: callback is the Spotify sign-in's redirect uri. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -41,6 +53,11 @@
             <!-- Launcher shortcuts: Now playing, Liked Songs, Search (Wrapped is added at run time). -->
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
+        <!-- Spotify's auth AAR claims the redirect uri for its login activity, which hands the login
+             to the Spotify app (dropping PKCE); sign-in doesn't use it. -->
+        <activity
+            android:name="com.spotify.sdk.android.auth.LoginActivity"
+            tools:node="remove" />
         <service
             android:name=".media.NowPlayingService"
             android:exported="false"
