@@ -52,18 +52,20 @@ class SpotifyAuth(
         return parsed.scheme.equals(ours.scheme, ignoreCase = true) && parsed.host.equals(ours.host, ignoreCase = true)
     }
 
-    /** Finishes the login [redirect] belongs to. The pending login is used up either way. */
+    /**
+     * Finishes the login [redirect] belongs to. Its state must match the pending login's, so a
+     * forged redirect can't end a login in progress; a matching one uses the login up either way.
+     */
     suspend fun handleRedirect(redirect: String): Result<Tokens> {
-        val pending = store.pendingLogin()
+        val params = query(redirect)
+        val pending = store.pendingLogin() ?: return Result.failure(AuthException("No login in progress"))
+        if (params["state"] != pending.state) return Result.failure(AuthException("Login state mismatch"))
         return try {
-            val params = query(redirect)
             params["error"]?.let { error ->
                 if (error == "access_denied") throw AuthException("Login cancelled", null, "cancelled")
                 throw AuthException("Spotify login failed ($error)", null, error)
             }
             val code = params["code"]?.takeIf { it.isNotBlank() } ?: throw AuthException("Spotify sent no code")
-            pending ?: throw AuthException("No login in progress")
-            if (params["state"] != pending.state) throw AuthException("Login state mismatch")
             val tokens = tokenClient.exchange(code, pending.verifier)
             store.save(tokens)
             Result.success(tokens)

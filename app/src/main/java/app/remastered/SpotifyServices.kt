@@ -59,12 +59,16 @@ class SpotifyServices(context: Context, scope: CoroutineScope, clock: () -> Long
 
     fun isLoginRedirect(uri: String?): Boolean = auth.isRedirect(uri)
 
-    /** Finishes sign-in from the browser's [redirect]; failures land in [loginError]. */
+    /** Finishes sign-in from the browser's [redirect]; failures land in [loginError]. A repeat while one runs is ignored. */
     suspend fun finishLogin(redirect: String) {
+        if (finishingLogin) return
         finishingLogin = true
-        val result = auth.handleRedirect(redirect)
+        val result = try {
+            auth.handleRedirect(redirect)
+        } finally {
+            finishingLogin = false
+        }
         signedIn = auth.isSignedIn
-        finishingLogin = false
         val e = result.exceptionOrNull() ?: return
         // Error codes only: never log the response itself, it may carry a code or token.
         Log.w("SpotifyServices", "Sign-in failed: ${e.javaClass.simpleName} ${(e as? AuthException)?.let { "status=${it.status} error=${it.error}" }.orEmpty()}")

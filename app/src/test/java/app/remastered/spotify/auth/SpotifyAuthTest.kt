@@ -71,20 +71,24 @@ class SpotifyAuthTest {
         assertTrue(form, "code_verifier=${pending.verifier}" in form)
     }
 
-    @Test fun `state mismatch is rejected without a token request`() = runTest {
+    @Test fun `state mismatch is rejected and leaves the login in progress`() = runTest {
         val auth = auth()
         auth.loginUrl()
-        val e = auth.handleRedirect("app.remastered://callback?code=c&state=nope").exceptionOrNull() as AuthException
-        assertEquals("Login state mismatch", e.message)
+        val pending = store.pendingLogin()
+        for (forged in listOf("code=c&state=nope", "error=server_error&state=nope", "error=access_denied")) {
+            val e = auth.handleRedirect("app.remastered://callback?$forged").exceptionOrNull() as AuthException
+            assertEquals("Login state mismatch", e.message)
+        }
         assertEquals(0, server.requestCount)
         assertNull(store.load())
-        assertNull(store.pendingLogin())
+        assertEquals(pending, store.pendingLogin())
     }
 
     @Test fun `denied login reads as cancelled`() = runTest {
         val auth = auth()
         auth.loginUrl()
-        val e = auth.handleRedirect("app.remastered://callback?error=access_denied&state=x").exceptionOrNull() as AuthException
+        val state = store.pendingLogin()!!.state
+        val e = auth.handleRedirect("app.remastered://callback?error=access_denied&state=$state").exceptionOrNull() as AuthException
         assertEquals("cancelled", e.error)
         assertNull(store.pendingLogin())
     }
