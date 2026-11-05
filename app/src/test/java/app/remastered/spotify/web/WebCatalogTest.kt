@@ -260,8 +260,10 @@ class WebCatalogTest {
         enqueue("""{"offset":1,"total":14,"next":null,"items":[$SIMPLE_TRACK]}""")
         val more = catalog.albumTracks("a1", offset = 1)
         assertEquals("Discovery", more.items.single().album!!.name)
-        take()
-        assertEquals("/v1/albums/a1/tracks", take().path)
+        assertEquals("from_token", take().query("market"))
+        val page = take()
+        assertEquals("/v1/albums/a1/tracks", page.path)
+        assertEquals("from_token", page.query("market"))
     }
 
     @Test fun `album tracks for unseen album fetch the album first`() = runTest {

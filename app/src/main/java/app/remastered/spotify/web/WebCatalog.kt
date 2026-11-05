@@ -128,7 +128,8 @@ class WebCatalog(
     }
 
     override suspend fun album(id: String): AlbumDetail {
-        val dto = get<AlbumDto>(url("albums", id))
+        // market=from_token makes Spotify report is_playable; without it every track reads as playable.
+        val dto = get<AlbumDto>(url("albums", id) { add("market", "from_token") })
         val album = dto.toModel() ?: throw malformed("album")
         val ref = AlbumRef(album.id, album.name, album.images).also { remember(it) }
         val tracks = dto.tracks?.toPage { it.toModel(ref) } ?: Page(emptyList(), 0, 0, false)
@@ -137,7 +138,7 @@ class WebCatalog(
 
     override suspend fun albumTracks(id: String, offset: Int, limit: Int): Page<Track> {
         val ref = synchronized(albumRefs) { albumRefs[id] } ?: album(id).album.let { AlbumRef(it.id, it.name, it.images) }
-        return get<PagingDto<TrackDto>>(url("albums", id, "tracks") { page(offset, limit, 50) }).toPage { it.toModel(ref) }
+        return get<PagingDto<TrackDto>>(url("albums", id, "tracks") { page(offset, limit, 50); add("market", "from_token") }).toPage { it.toModel(ref) }
     }
 
     override suspend fun artist(id: String): Artist =

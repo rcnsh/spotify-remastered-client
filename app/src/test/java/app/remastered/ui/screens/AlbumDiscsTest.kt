@@ -24,6 +24,12 @@ class AlbumDiscsTest {
         assertEquals(listOf(1, 2), d.map { it.number })
     }
 
+    @Test fun contextPositionsSkipUnplayableTracks() {
+        val removed = track(3, 1).copy(isPlayable = false)
+        val tracks = listOf(track(1, 1), track(2, 1), removed, track(4, 1), track(5, 1))
+        assertEquals(listOf(0, 1, null, 2, 3), contextPositions(tracks))
+    }
+
     @Test fun noNumbersStaysOneDisc() {
         assertEquals(1, discs(listOf(track(null, null), track(null, null))).size)
     }

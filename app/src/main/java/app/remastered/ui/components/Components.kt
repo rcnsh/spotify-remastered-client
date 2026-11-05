@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -174,10 +175,13 @@ fun TrackRow(
     trailing: (@Composable RowScope.() -> Unit)? = null,
     /** Null leaves the long press free, e.g. for dragging the row ([reorderable]). */
     onLongClick: (() -> Unit)? = onMore,
+    /** False dims the row for a track Spotify can't play; the ⋯ menu still opens. */
+    enabled: Boolean = true,
 ) {
     Row(
         modifier.fillMaxWidth().height(64.dp)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .alpha(if (enabled) 1f else 0.4f)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

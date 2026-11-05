@@ -102,16 +102,18 @@ fun AlbumScreen(app: AppState, id: String) {
                         }
                     }
                     val discs = discs(d.tracks)
+                    val positions = contextPositions(d.tracks)
                     for (disc in discs) {
                         if (discs.size > 1) item(key = "disc" + disc.number) { DiscHeader(disc.number) }
                         items(disc.tracks, key = { "t" + it.value.id + it.index }) { (index, t) ->
                             TrackRow(
                                 t,
-                                onClick = { app.playAt(a.uri, index) },
+                                onClick = { positions[index]?.let { app.playAt(a.uri, it) } },
                                 onMore = { app.menu = app.trackMenu(t.copy(album = t.album ?: albumRef(a))) },
                                 playing = player?.track?.uri == t.uri,
                                 liked = t.uri in liked,
                                 number = t.trackNumber ?: (index + 1),
+                                enabled = t.isPlayable,
                             )
                         }
                     }
@@ -127,6 +129,16 @@ fun AlbumScreen(app: AppState, id: String) {
         }
         TopBar(app, title = data.value?.album?.name, solid = scrolled)
     }
+}
+
+/**
+ * Each track's index in the album as Spotify plays it, or null for a track that can't play.
+ * Spotify leaves unplayable tracks (removed, region-locked) out of the album context, so
+ * skipToIndex counts only the playable ones.
+ */
+internal fun contextPositions(tracks: List<Track>): List<Int?> {
+    var next = 0
+    return tracks.map { if (it.isPlayable) next++ else null }
 }
 
 /** One disc of an album; [tracks] keep their index in the whole album, which playback uses. */
