@@ -36,7 +36,7 @@ through the warehouse when it serves them), and warehouse URL and token. It's gi
 Related repos in `~/dev`:
 - `music-warehouse`: the Worker the client reads. Uses Wrangler (`wrangler.jsonc`); keep it.
 - `music-warehouse-wrapped`: the web Wrapped (Remotion), reference for the native port.
-- `music-warehouse-gui`: macOS app (Rust/GPUI) over the same API, reference for Stats.
+- `music-warehouse-gui`: desktop app (Rust/GPUI) over the same API, reference for Stats.
 
 ## Rules
 
